@@ -7,7 +7,7 @@ skill-rails uses the same CLI, stdio MCP server, and SKILL.md instructions acros
 | Client | Skill discovery location (project) | Integration | Live verification |
 |---|---|---|---|
 | Claude Code | Plugin marketplace | Existing plugin | Not rerun for these changes |
-| Codex CLI / IDE | `.agents/skills/` | CLI or stdio MCP | Pending |
+| Codex CLI / IDE | Native plugin or `.agents/skills/` | Plugin, CLI or stdio MCP | Marketplace discovery verified; agent-driven flows pending |
 | Cursor | `.cursor/skills/` | CLI or stdio MCP | Pending |
 | Copilot in VS Code | `.github/skills/` | CLI or stdio MCP | Pending |
 | Gemini CLI | `.gemini/skills/` | CLI or stdio MCP | Pending |
@@ -17,7 +17,7 @@ This table describes setup targets, not certified client behavior. Copilot cloud
 
 ## Use the current checkout
 
-These changes must be released before published `npx` commands include them. To try them now, build this checkout:
+Native Codex plugin packaging is available in this checkout and will ship in the next npm release. The underlying runner is already available as `skill-rails@0.2.1`. To try local runner changes, build this checkout:
 
 ```bash
 yarn install --immutable
@@ -31,13 +31,35 @@ The project directory controls shell execution and state lookup. The flow path i
 
 ### Codex
 
-Register the checkout's server:
+Install the plugin from this checkout:
+
+```bash
+codex plugin marketplace add /absolute/path/to/skill-rails
+codex plugin add skill-rails@skill-rails
+```
+
+After these changes merge into the GitHub repository, the remote installation is:
+
+```bash
+codex plugin marketplace add juanigalan91/skill-rails
+codex plugin add skill-rails@skill-rails
+```
+
+Use a Codex version whose `codex plugin --help` exposes these commands. Restart the client or start a new session after installation. The plugin bundles `run-skill-rails`, `create-skill-rails`, and `migrate-to-skill-rails`, plus the stdio MCP server; no manual skill wrappers or separate MCP registration are needed. In desktop clients, the marketplace can also be browsed through the Plugins UI.
+
+Launch Codex in the intended project and check `cwd` in the first flow report. The bundled MCP server uses `npx -y skill-rails@0.2 mcp`, so Node, npm, Bash, and access to the npm registry (or a cached package) are required. The plugin installs instructions and configuration; it does not vendor npm dependencies or install Node.
+
+The package has portable `plugin.json` and `mcp.json` files, a `.codex-plugin/plugin.json` compatibility manifest, and a `.agents/plugins/marketplace.json` catalog pointing to the package root. Both formats share the same skills and npm runner as the Claude plugin. This adds local/Git marketplace support, not public-directory publication.
+
+Marketplace discovery was verified with Codex CLI `0.169.0-alpha.11.1`. Complete the smoke test below before treating agent-driven workflows as verified.
+
+For clients without native plugin installation, use the manual skills setup below and register the checkout's server:
 
 ```bash
 codex mcp add skill-rails -- node /absolute/path/to/skill-rails/bin/skill-rails.js mcp --cwd /absolute/path/to/project
 ```
 
-Sources: [local skills](https://learn.chatgpt.com/docs/build-skills), [MCP](https://learn.chatgpt.com/docs/extend/mcp?surface=cli).
+Sources: [plugin packaging](https://developers.openai.com/plugins/build/plugins), [local skills](https://learn.chatgpt.com/docs/build-skills), [MCP](https://learn.chatgpt.com/docs/extend/mcp?surface=cli).
 
 ### Cursor
 
@@ -110,9 +132,9 @@ Merge into `opencode.json`. This is the v2 configuration shape; consult the matc
 
 Sources: [skills](https://opencode.ai/docs/skills/), [MCP](https://opencode.ai/docs/mcp-servers).
 
-## Install the skills
+## Install the skills manually
 
-Keep this checkout available. For each entry in `skills/`, create a folder in the client's skill discovery directory from the table above, with a `SKILL.md` wrapper containing the matching name and description and an absolute link to the original instructions. For example, `.agents/skills/run-skill-rails/SKILL.md`:
+Skip this section when using the native plugin. For a manual installation, keep this checkout available. For each entry in `skills/`, create a folder in the client's skill discovery directory from the table above, with a `SKILL.md` wrapper containing the matching name and description and an absolute link to the original instructions. For example, `.agents/skills/run-skill-rails/SKILL.md`:
 
 ```markdown
 ---
