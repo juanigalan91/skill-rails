@@ -5,15 +5,15 @@ description: "<What the skill does, and when to use it.>"
 
 # <Skill title>
 
-This skill runs `flow.yaml` with skill-rails.
+This skill runs `rails.yaml` with skill-rails.
 Run the flow with the `run-skill-rails` skill, or follow these steps.
 
-Resolve [flow.yaml](flow.yaml) relative to this SKILL.md and substitute its absolute directory below. Run commands in the intended project directory; add `--cwd <project-directory>` when needed.
+Resolve [rails.yaml](rails.yaml) relative to this SKILL.md and substitute its absolute directory below. Run commands in the intended project directory; add `--cwd <project-directory>` when needed.
 
 1. Start the flow:
 
    ```bash
-   npx -y skill-rails@0.2 start "<absolute-path-to-this-skill>/flow.yaml" [--input <key>=<value> ...]
+   npx -y skill-rails@0.2 start "<absolute-path-to-this-skill>/rails.yaml" [--input <key>=<value> ...]
    ```
 
 2. Act on the `status` of each result:

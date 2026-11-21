@@ -50,8 +50,8 @@ steps:
 let dir: string;
 let file: string;
 beforeEach(() => {
-  dir = tempDir({ 'flow.yaml': FLOW });
-  file = path.join(dir, 'flow.yaml');
+  dir = tempDir({ 'rails.yaml': FLOW });
+  file = path.join(dir, 'rails.yaml');
   process.env.SKILL_RAILS_STATE_DIR = path.join(dir, 'state');
 });
 
@@ -98,8 +98,8 @@ describe('a flow run', () => {
   });
 
   it('ends with failure when a run step fails, with its stderr', () => {
-    const failing = tempDir({ 'flow.yaml': 'name: broken\nsteps:\n  - id: x\n    run: echo nope >&2; exit 4\n' });
-    expect(start({ file: path.join(failing, 'flow.yaml'), cwd: failing })).toMatchObject({
+    const failing = tempDir({ 'rails.yaml': 'name: broken\nsteps:\n  - id: x\n    run: echo nope >&2; exit 4\n' });
+    expect(start({ file: path.join(failing, 'rails.yaml'), cwd: failing })).toMatchObject({
       status: 'failed',
       message: 'Step "x" failed with exit code 4.\nnope',
     });
@@ -107,9 +107,9 @@ describe('a flow run', () => {
 
   it('goes on after a failed run step with continue-on-error', () => {
     const flow = tempDir({
-      'flow.yaml': "name: soft\nsteps:\n  - id: x\n    run: exit 1\n    continue-on-error: true\n  - stop: '${{ steps.x.outcome }}'\n",
+      'rails.yaml': "name: soft\nsteps:\n  - id: x\n    run: exit 1\n    continue-on-error: true\n  - stop: '${{ steps.x.outcome }}'\n",
     });
-    expect(start({ file: path.join(flow, 'flow.yaml'), cwd: flow })).toMatchObject({ status: 'done', message: 'failure' });
+    expect(start({ file: path.join(flow, 'rails.yaml'), cwd: flow })).toMatchObject({ status: 'done', message: 'failure' });
   });
 
   it('refuses unknown and wrong inputs', () => {
@@ -124,10 +124,10 @@ describe('a flow run', () => {
 
   it('renders the preview of an option', () => {
     const flow = tempDir({
-      'flow.yaml':
+      'rails.yaml':
         "name: preview\nsteps:\n  - id: draft\n    run: echo 'text=Hello' >> \"$FLOW_OUTPUT\"\n  - id: ok\n    ask:\n      - id: answer\n        header: Draft\n        question: Write it?\n        options:\n          - { label: Write it, description: Write the file., preview: '${{ steps.draft.outputs.text }}' }\n          - { label: Stop, description: Write nothing. }\n",
     });
-    const result = start({ file: path.join(flow, 'flow.yaml'), cwd: flow }) as StepReport;
+    const result = start({ file: path.join(flow, 'rails.yaml'), cwd: flow }) as StepReport;
     expect(result.questions?.[0]?.options[0]).toEqual({ label: 'Write it', description: 'Write the file.', preview: 'Hello' });
   });
 

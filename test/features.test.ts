@@ -9,7 +9,7 @@ type StepReport = Extract<Report, { status: 'step' }>;
 let dir: string;
 const run = (files: Record<string, string>, inputs: Record<string, unknown> = {}) => {
   dir = tempDir(files);
-  return start({ file: path.join(dir, 'flow.yaml'), cwd: dir, inputs });
+  return start({ file: path.join(dir, 'rails.yaml'), cwd: dir, inputs });
 };
 const answer = (flow: string, id: string, output?: unknown) => done({ flow, id, output, cwd: dir });
 
@@ -36,40 +36,40 @@ steps:
 `;
 
   it('runs the steps once per item, with item and loop.index, and keeps the results', () => {
-    expect(run({ 'flow.yaml': FLOW })).toMatchObject({ id: 'ok', instructions: 'Accept a (a-0)?' });
+    expect(run({ 'rails.yaml': FLOW })).toMatchObject({ id: 'ok', instructions: 'Accept a (a-0)?' });
     expect(answer('loop', 'ok', { ok: true })).toMatchObject({ id: 'ok', instructions: 'Accept b (b-1)?' });
     expect(answer('loop', 'ok', { ok: false })).toMatchObject({ status: 'done', message: '2 items, last ok false' });
   });
 
   it('skips an empty list', () => {
     const flow = "name: empty\nsteps:\n  - id: each\n    foreach: []\n    steps:\n      - id: x\n        prompt: never\n  - stop: '${{ steps.each.outputs.count }}'\n";
-    expect(run({ 'flow.yaml': flow })).toMatchObject({ status: 'done', message: '0' });
+    expect(run({ 'rails.yaml': flow })).toMatchObject({ status: 'done', message: '0' });
   });
 
   it('fails when the value is not a list', () => {
     const flow = "name: bad\nsteps:\n  - id: each\n    foreach: '${{ 3 }}'\n    steps:\n      - stop: x\n";
-    expect(run({ 'flow.yaml': flow })).toMatchObject({ status: 'failed', message: 'Step "each": foreach needs a list, and got 3.' });
+    expect(run({ 'rails.yaml': flow })).toMatchObject({ status: 'failed', message: 'Step "each": foreach needs a list, and got 3.' });
   });
 
   it('ends the whole flow on a stop inside the loop', () => {
     const flow = "name: early\nsteps:\n  - id: each\n    foreach: [1, 2, 3]\n    steps:\n      - if: '${{ item == 2 }}'\n        stop: 'stopped at ${{ item }}'\n  - stop: never\n";
-    expect(run({ 'flow.yaml': flow })).toMatchObject({ status: 'done', message: 'stopped at 2' });
+    expect(run({ 'rails.yaml': flow })).toMatchObject({ status: 'done', message: 'stopped at 2' });
   });
 
   it('ends the loop on a break, and keeps the finished iterations', () => {
     const flow = "name: brk\nsteps:\n  - id: each\n    foreach: [1, 2, 3]\n    steps:\n      - id: seen\n        run: echo \"v=$V\" >> \"$FLOW_OUTPUT\"\n        env: { V: '${{ item }}' }\n      - if: '${{ item == 2 }}'\n        break: true\n  - stop: '${{ steps.each.outputs.done }} of ${{ steps.each.outputs.count }}, broken ${{ steps.each.outputs.broken }}, last ${{ steps.each.outputs.results[1].steps.seen.outputs.v }}'\n";
-    expect(run({ 'flow.yaml': flow })).toMatchObject({ status: 'done', message: '2 of 3, broken true, last 2' });
+    expect(run({ 'rails.yaml': flow })).toMatchObject({ status: 'done', message: '2 of 3, broken true, last 2' });
   });
 
   it('refuses a break outside a foreach', () => {
-    dir = tempDir({ 'flow.yaml': 'name: bad\nsteps:\n  - break: true\n' });
-    expect(check({ file: path.join(dir, 'flow.yaml') })).toMatchObject({ status: 'error', errors: ['/steps/0: break is allowed only inside a foreach'] });
+    dir = tempDir({ 'rails.yaml': 'name: bad\nsteps:\n  - break: true\n' });
+    expect(check({ file: path.join(dir, 'rails.yaml') })).toMatchObject({ status: 'error', errors: ['/steps/0: break is allowed only inside a foreach'] });
   });
 
   it('checks the steps inside a foreach', () => {
     const flow = "name: bad\nsteps:\n  - id: each\n    foreach: [1]\n    steps:\n      - id: x\n        run: echo ${{ item }}\n";
-    dir = tempDir({ 'flow.yaml': flow });
-    expect(check({ file: path.join(dir, 'flow.yaml') })).toMatchObject({ status: 'error', errors: ['/steps/0/steps/0/run must NOT be valid (run step)'] });
+    dir = tempDir({ 'rails.yaml': flow });
+    expect(check({ file: path.join(dir, 'rails.yaml') })).toMatchObject({ status: 'error', errors: ['/steps/0/steps/0/run must NOT be valid (run step)'] });
   });
 });
 
@@ -93,7 +93,7 @@ steps:
 name: parent
 steps:
   - id: greet
-    uses: child/flow.yaml
+    uses: child/rails.yaml
     with: { who: '\${{ inputs.name }}' }${extra}
   - stop: 'child said "\${{ steps.greet.outputs.message }}" (\${{ steps.greet.outputs.status }}), saw \${{ steps.greet.outputs.steps.hello.outputs.text }}'
 inputs:
@@ -101,29 +101,29 @@ inputs:
 `;
 
   it('runs the other flow as one step, with its own inputs and steps', () => {
-    expect(run({ 'flow.yaml': parent(), 'child/flow.yaml': CHILD }, { name: 'ana' })).toMatchObject({ id: 'confirm', instructions: 'Confirm hi ana.' });
+    expect(run({ 'rails.yaml': parent(), 'child/rails.yaml': CHILD }, { name: 'ana' })).toMatchObject({ id: 'confirm', instructions: 'Confirm hi ana.' });
     expect(answer('parent', 'confirm')).toMatchObject({ status: 'done', message: 'child said "hi ana" (done), saw hi ana' });
   });
 
   it('fails the parent when the other flow fails', () => {
-    run({ 'flow.yaml': parent(), 'child/flow.yaml': CHILD }, { name: 'bad' });
+    run({ 'rails.yaml': parent(), 'child/rails.yaml': CHILD }, { name: 'bad' });
     expect(answer('parent', 'confirm')).toMatchObject({ status: 'failed', message: 'Step "greet" failed: bad name' });
   });
 
   it('goes on after a failed flow with continue-on-error', () => {
-    run({ 'flow.yaml': parent('\n    continue-on-error: true'), 'child/flow.yaml': CHILD }, { name: 'bad' });
+    run({ 'rails.yaml': parent('\n    continue-on-error: true'), 'child/rails.yaml': CHILD }, { name: 'bad' });
     expect(answer('parent', 'confirm')).toMatchObject({ status: 'done', message: 'child said "bad name" (failed), saw hi bad' });
   });
 
   it('fails on a missing input of the other flow', () => {
-    expect(run({ 'flow.yaml': parent(), 'child/flow.yaml': CHILD })).toMatchObject({ status: 'failed', message: /input "who" is required/ });
+    expect(run({ 'rails.yaml': parent(), 'child/rails.yaml': CHILD })).toMatchObject({ status: 'failed', message: /input "who" is required/ });
   });
 
   it('refuses flows that use each other', () => {
-    dir = tempDir({ 'a/flow.yaml': 'name: a\nsteps:\n  - id: b\n    uses: ../b/flow.yaml\n', 'b/flow.yaml': 'name: b\nsteps:\n  - id: a\n    uses: ../a/flow.yaml\n' });
-    const result = check({ file: path.join(dir, 'a', 'flow.yaml') });
+    dir = tempDir({ 'a/rails.yaml': 'name: a\nsteps:\n  - id: b\n    uses: ../b/rails.yaml\n', 'b/rails.yaml': 'name: b\nsteps:\n  - id: a\n    uses: ../a/rails.yaml\n' });
+    const result = check({ file: path.join(dir, 'a', 'rails.yaml') });
     expect(result).toMatchObject({ status: 'error' });
-    expect(JSON.stringify(result)).toContain('the flows use each other: a/flow.yaml → b/flow.yaml → a/flow.yaml');
+    expect(JSON.stringify(result)).toContain('the flows use each other: a/rails.yaml → b/rails.yaml → a/rails.yaml');
   });
 });
 
@@ -141,19 +141,19 @@ steps:
 `;
 
   it('runs the command again until the condition is true', () => {
-    expect(run({ 'flow.yaml': poll('1') })).toMatchObject({ status: 'done', message: 'ready after ready' });
+    expect(run({ 'rails.yaml': poll('1') })).toMatchObject({ status: 'done', message: 'ready after ready' });
   });
 
   it('fails when the next poll would exceed the time limit', () => {
     const clock = vi.spyOn(Date, 'now').mockReturnValue(1000);
-    const dir = tempDir({ 'flow.yaml': poll('0.001') });
+    const dir = tempDir({ 'rails.yaml': poll('0.001') });
     const exec = vi.fn(() => {
       // A 20 ms check leaves less than the 50 ms interval in the 60 ms budget.
       clock.mockReturnValue(1020);
       return { outcome: 'success' as const, exitCode: 0, outputs: { state: 'pending' }, warnings: [], stderr: '' };
     });
     try {
-      expect(start({ file: path.join(dir, 'flow.yaml'), cwd: dir, exec })).toMatchObject({ status: 'failed', message: 'Step "wait" timed out after 0.001 minutes.' });
+      expect(start({ file: path.join(dir, 'rails.yaml'), cwd: dir, exec })).toMatchObject({ status: 'failed', message: 'Step "wait" timed out after 0.001 minutes.' });
       expect(exec.mock.calls).toHaveLength(1);
       expect(status({ flow: 'poll', cwd: dir })).toMatchObject({ results: { wait: { outcome: 'failure' } } });
     } finally {
@@ -164,9 +164,9 @@ steps:
   it('persists the next poll time, refuses early polling, and resumes when due', () => {
     const clock = vi.spyOn(Date, 'now').mockReturnValue(1000);
     const exec = vi.fn(() => ({ outcome: 'success' as const, exitCode: 0, outputs: { state: 'pending' }, warnings: [], stderr: '' }));
-    const dir = tempDir({ 'flow.yaml': poll('1').replace('interval-seconds: 0.05', 'interval-seconds: 30') });
+    const dir = tempDir({ 'rails.yaml': poll('1').replace('interval-seconds: 0.05', 'interval-seconds: 30') });
     try {
-      expect(start({ file: path.join(dir, 'flow.yaml'), cwd: dir, exec })).toMatchObject({ status: 'step', type: 'wait', retryAt: 31000, cwd: dir });
+      expect(start({ file: path.join(dir, 'rails.yaml'), cwd: dir, exec })).toMatchObject({ status: 'step', type: 'wait', retryAt: 31000, cwd: dir });
       expect(exec.mock.calls).toHaveLength(1);
       expect(done({ flow: 'poll', id: 'wait', cwd: dir, exec })).toMatchObject({ status: 'step', retryAt: 31000 });
       expect(exec.mock.calls).toHaveLength(1);
@@ -182,9 +182,9 @@ steps:
   it('fails an expired persisted poll without running another command', () => {
     const clock = vi.spyOn(Date, 'now').mockReturnValue(1000);
     const exec = vi.fn(() => ({ outcome: 'success' as const, exitCode: 0, outputs: { state: 'pending' }, warnings: [], stderr: '' }));
-    const dir = tempDir({ 'flow.yaml': poll('1').replace('interval-seconds: 0.05', 'interval-seconds: 30') });
+    const dir = tempDir({ 'rails.yaml': poll('1').replace('interval-seconds: 0.05', 'interval-seconds: 30') });
     try {
-      expect(start({ file: path.join(dir, 'flow.yaml'), cwd: dir, exec })).toMatchObject({ status: 'step', type: 'wait' });
+      expect(start({ file: path.join(dir, 'rails.yaml'), cwd: dir, exec })).toMatchObject({ status: 'step', type: 'wait' });
       clock.mockReturnValue(61001);
       expect(done({ flow: 'poll', id: 'wait', cwd: dir, exec })).toMatchObject({ status: 'failed', message: 'Step "wait" timed out after 1 minutes.' });
       expect(exec.mock.calls).toHaveLength(1);
@@ -195,13 +195,13 @@ steps:
   });
 
   it('bounds poll commands by the call slice', () => {
-    const dir = tempDir({ 'flow.yaml': poll('1') });
+    const dir = tempDir({ 'rails.yaml': poll('1') });
     const exec = vi.fn((_command: string, options: import('../src/types.js').RunOptions) => {
       expect(options.timeoutMs).toBeGreaterThan(0);
       expect(options.timeoutMs).toBeLessThanOrEqual(20000);
       return { outcome: 'success' as const, exitCode: 0, outputs: { state: 'ready' }, warnings: [], stderr: '' };
     });
-    expect(start({ file: path.join(dir, 'flow.yaml'), cwd: dir, exec })).toMatchObject({ status: 'done' });
+    expect(start({ file: path.join(dir, 'rails.yaml'), cwd: dir, exec })).toMatchObject({ status: 'done' });
   });
 });
 
@@ -219,14 +219,14 @@ steps:
 `;
 
   it('accepts any non-empty text', () => {
-    const first = run({ 'flow.yaml': FLOW }) as StepReport;
+    const first = run({ 'rails.yaml': FLOW }) as StepReport;
     expect(first.questions?.[0]).toMatchObject({ free: true, options: [] });
     expect(answer('free', 'intent', { what: '' })).toMatchObject({ status: 'invalid' });
     expect(answer('free', 'intent', { what: 'No raw SQL in the API layer' })).toMatchObject({ status: 'done', message: 'No raw SQL in the API layer' });
   });
 
   it('keeps the status of the root flow', () => {
-    run({ 'flow.yaml': FLOW });
+    run({ 'rails.yaml': FLOW });
     expect(status({ flow: 'free', cwd: dir })).toMatchObject({ status: 'step', id: 'intent' });
   });
 });

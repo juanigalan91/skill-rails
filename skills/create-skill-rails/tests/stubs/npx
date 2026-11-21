@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -eo pipefail
+if [ "$1" != '-y' ] || [ "$2" != 'skill-rails@0.2' ]; then
+  echo "Unexpected npx invocation" >&2
+  exit 1
+fi
+root="$(cd "$(dirname "$0")/../../../.." && pwd)"
+exec node "$root/bin/skill-rails.js" "${@:3}"

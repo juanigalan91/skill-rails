@@ -1,0 +1,34 @@
+name: migrate-to-skill-rails
+inputs:
+  source: { type: string, required: true, description: Skill folder or SKILL.md to migrate in place. }
+  request: { type: string, description: Additional migration requirements. }
+  auto: { type: boolean, default: false }
+steps:
+  - id: context
+    run: node "$FLOW_DIR/scripts/context.mjs"
+    env:
+      SOURCE: ${{ inputs.source }}
+  - id: audit
+    prompt-file: prompts/audit.md
+    output:
+      type: object
+      required: [brief, rules]
+      properties:
+        brief: { type: string, minLength: 1 }
+        rules:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [rule, destination]
+            properties:
+              rule: { type: string, minLength: 1 }
+              destination: { type: string, minLength: 1 }
+  - id: create
+    uses: ../create-skill-rails/rails.yaml
+    with:
+      source: ${{ steps.context.outputs.source }}
+      target: ${{ steps.context.outputs.target }}
+      auto: ${{ inputs.auto }}
+      request: 'Migrate the original skill, preserving every rule. ${{ inputs.request }} Migration brief: ${{ steps.audit.outputs.brief }} Rule mapping: ${{ toJSON(steps.audit.outputs.rules) }}'
+  - stop: '${{ steps.create.outputs.message }} Migrated in place at ${{ steps.context.outputs.target }}.'

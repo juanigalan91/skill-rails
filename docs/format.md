@@ -36,7 +36,7 @@ steps:
 ```text
 my-skill/
   SKILL.md        # the short loop: start the flow, do each step, report it
-  flow.yaml       # the order, the conditions and the inputs of the steps
+  rails.yaml       # the order, the conditions and the inputs of the steps
   scripts/        # the code of the run steps; this folder is in PATH
   prompts/        # the instructions of the agent steps
 ```
@@ -59,8 +59,8 @@ The runner runs the command with `bash -eo pipefail`, in the working directory o
   continue-on-error: true
 ```
 
-- `scripts/` next to `flow.yaml` is first in `PATH`, so `run: build.sh` runs `scripts/build.sh`.
-- `$FLOW_DIR` is the folder of `flow.yaml`.
+- `scripts/` next to `rails.yaml` is first in `PATH`, so `run: build.sh` runs `scripts/build.sh`.
+- `$FLOW_DIR` is the folder of `rails.yaml`.
 - The command writes its outputs to the file `$FLOW_OUTPUT`, as in GitHub Actions: `key=value` lines, or `key<<EOF`, several lines, then `EOF`.
   Later steps read them as `steps.<id>.outputs.<key>`.
 - A `::warning::<text>` line on stdout becomes a note that the agent shows to the user.
@@ -102,7 +102,7 @@ The agent follows the instructions, then reports an output.
       summary: { type: string, maxLength: 300 }
 ```
 
-- `prompt` holds the instructions inline, and `prompt-file` names a Markdown file relative to `flow.yaml`.
+- `prompt` holds the instructions inline, and `prompt-file` names a Markdown file relative to `rails.yaml`.
   Both can hold `${{ }}` expressions.
 - `output` is a JSON Schema.
   The runner validates the reported output and refuses it with the errors when it does not match.
@@ -192,7 +192,7 @@ The runner runs another flow as one step.
 
 ```yaml
 - id: ci
-  uses: ../diagnose-ci/flow.yaml   # relative to this flow file
+  uses: ../diagnose-ci/rails.yaml   # relative to this flow file
   with:
     pr: ${{ steps.context.outputs.pr_number }}
   continue-on-error: true

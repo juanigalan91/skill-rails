@@ -1,10 +1,12 @@
 ---
 name: run-skill-rails
-description: "Run a skill-rails flow file (flow.yaml) step by step: the runner gives one step at a time, you do it and report its output. Use when a skill tells you to run a flow, or when asked to run a skill-rails flow."
-argument-hint: "<flow.yaml> [key=value ...]"
+description: "Run a skill-rails flow file (rails.yaml) step by step: the runner gives one step at a time, you do it and report its output. Use when a skill tells you to run a flow, or when asked to run a skill-rails flow."
+argument-hint: "<rails.yaml> [key=value ...]"
 ---
 
 # Run a skill-rails flow
+
+This skill is the Markdown bootstrap for driving flows, including the create and migrate skills. It stays outside a flow so invoking the runner does not recurse into itself.
 
 The runner decides the order of the steps, runs the shell steps itself, and checks each output that you report.
 You do only the step that it gives you, one at a time.
@@ -17,7 +19,7 @@ Otherwise use the CLI: `npx -y skill-rails@0.2 <command>`.
 ## Step 1: Start
 
 ```bash
-npx -y skill-rails@0.2 start <flow.yaml> [--input <key>=<value> ...]
+npx -y skill-rails@0.2 start <rails.yaml> [--input <key>=<value> ...]
 ```
 
 Give only the inputs that the caller or the invocation text gives.

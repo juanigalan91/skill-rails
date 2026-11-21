@@ -9,7 +9,7 @@ const errorsOf = (flow: unknown) => validateFlow(flow);
 
 describe('validateFlow', () => {
   it('accepts the examples', () => {
-    for (const name of ['hello', 'open-pr']) expect(() => loadFlow(path.join(root, 'examples', name, 'flow.yaml'))).not.toThrow();
+    for (const name of ['hello', 'open-pr']) expect(() => loadFlow(path.join(root, 'examples', name, 'rails.yaml'))).not.toThrow();
   });
 
   it('refuses ${{ }} in a run command, with one error for that step type', () => {
@@ -41,14 +41,14 @@ describe('validateFlow', () => {
 
 describe('loadFlow', () => {
   it('reads a prompt file next to the flow', () => {
-    const dir = tempDir({ 'flow.yaml': 'name: x\nsteps:\n  - id: a\n    prompt-file: prompts/a.md\n', 'prompts/a.md': 'Do ${{ inputs.x }}.\n' });
-    expect((loadFlow(path.join(dir, 'flow.yaml')).steps[0] as { prompt?: string }).prompt).toBe('Do ${{ inputs.x }}.\n');
+    const dir = tempDir({ 'rails.yaml': 'name: x\nsteps:\n  - id: a\n    prompt-file: prompts/a.md\n', 'prompts/a.md': 'Do ${{ inputs.x }}.\n' });
+    expect((loadFlow(path.join(dir, 'rails.yaml')).steps[0] as { prompt?: string }).prompt).toBe('Do ${{ inputs.x }}.\n');
   });
 
   it('reports a missing prompt file and a bad expression', () => {
-    const dir = tempDir({ 'flow.yaml': 'name: x\nsteps:\n  - id: a\n    prompt-file: prompts/none.md\n  - if: nope.x\n    stop: s\n' });
+    const dir = tempDir({ 'rails.yaml': 'name: x\nsteps:\n  - id: a\n    prompt-file: prompts/none.md\n  - if: nope.x\n    stop: s\n' });
     try {
-      loadFlow(path.join(dir, 'flow.yaml'));
+      loadFlow(path.join(dir, 'rails.yaml'));
       expect.unreachable();
     } catch (error) {
       expect(error).toBeInstanceOf(FlowError);

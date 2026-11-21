@@ -69,10 +69,10 @@ If the user wants a draft, add `--draft`.
 Run `gh pr create --title "<title>" --body-file <file>` and show the URL.
 ````
 
-**After:** `flow.yaml` holds the order and the conditions, `scripts/` the commands, and `prompts/` the only part that needs the model.
+**After:** `rails.yaml` holds the order and the conditions, `scripts/` the commands, and `prompts/` the only part that needs the model.
 
 ```yaml
-# flow.yaml
+# rails.yaml
 name: open-pr
 steps:
   - id: context
@@ -121,7 +121,7 @@ What changes:
 The agent drives the loop from inside its own session and uses its tools for agent steps. The runner executes shell steps:
 
 ```text
-agent ── start flow.yaml ──▶ runner  (runs the shell steps, then stops at the first agent step)
+agent ── start rails.yaml ──▶ runner  (runs the shell steps, then stops at the first agent step)
 agent ◀── { status: step, instructions, output schema } ──
 agent ── done <step> <json> ──▶ runner  (validates the output, runs the next shell steps)
 agent ◀── { status: done, message } ──
@@ -192,8 +192,8 @@ This installs the three skills and the local MCP configuration. See [Codex setup
 As a CLI or a library (Node 20 or later):
 
 ```bash
-yarn add skill-rails        # or: npx skill-rails check flow.yaml
-yarn skill-rails check flow.yaml
+yarn add skill-rails        # or: npx skill-rails check rails.yaml
+yarn skill-rails check rails.yaml
 ```
 
 ```ts
@@ -213,15 +213,17 @@ Codex, Cursor, Copilot in VS Code, Gemini CLI, and OpenCode can use the shared s
 ## Use
 
 - **Run a flow:** the `run-skill-rails` skill, the MCP tools `flow_start` and `flow_done`, or the CLI.
-- **Create a skill:** the `create-skill-rails` skill designs the steps and writes `flow.yaml`, `scripts/` and `prompts/`.
-- **Migrate a skill:** the `migrate-to-skill-rails` skill converts a Markdown skill, keeps every rule, and compares the two versions.
+- **Create a skill:** the `create-skill-rails` skill designs the steps and writes `rails.yaml`, `scripts/` and `prompts/`.
+- **Migrate a skill:** the `migrate-to-skill-rails` skill audits the existing rules and rewrites the skill in place, using `rails.yaml` and the shared creation flow. It creates no sibling copies or backups.
+
+The bundled create and migrate skills run their own YAML flows. Scripts scaffold a new skill or prepare an existing directory for migration, validate the generated flow, and run its deterministic tests; prompts handle design, authoring, repairs, and safe smoke runs. The runner skill stays as the Markdown bootstrap. See the [migration audit](docs/skill-migration/README.md).
 
 A flow skill is a folder:
 
 ```text
 my-skill/
   SKILL.md        # the short loop: start the flow, do each step, report it
-  flow.yaml       # the order, the conditions and the inputs
+  rails.yaml       # the order, the conditions and the inputs
   scripts/        # the code of the run steps (in PATH)
   prompts/        # the instructions of the agent steps
 ```
@@ -233,7 +235,7 @@ A test gives the answers that the agent would give, and the runner does the rest
 
 ```yaml
 # tests/open-pr.test.yaml
-flow: ../flow.yaml
+flow: ../rails.yaml
 path: [stubs]                       # a stub gh, so the test never calls GitHub
 setup: |                            # a local remote and a branch with one commit
   git init -q --bare "$(mktemp -d)/origin.git" ...
@@ -261,12 +263,12 @@ See [Testing flows](docs/testing.md).
 ## CLI
 
 ```text
-skill-rails start <flow.yaml> [--input <key>=<value> ...]   check the flow, reset its state, print the first agent step
+skill-rails start <rails.yaml> [--input <key>=<value> ...]   check the flow, reset its state, print the first agent step
 skill-rails done <flow> <step-id> [--output <json> | -]     record the output of a step, print the next step
 skill-rails done <flow> <step-id> --fail <reason>           end the flow with an error
 skill-rails status <flow>                                   print the current step and the step results
 skill-rails reset <flow>                                    delete the state of a flow
-skill-rails check <flow.yaml>                               check a flow file without running it
+skill-rails check <rails.yaml>                               check a flow file without running it
 skill-rails mcp                                             run the MCP server on stdio
 ```
 
