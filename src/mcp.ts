@@ -15,7 +15,7 @@ const LOOP =
   'Act on the status of the result: step → do the step, then call flow_done; invalid → correct the output and call flow_done again; done or failed → tell the user the message.';
 
 export function createServer({ cwd = process.cwd() }: { cwd?: string } = {}): McpServer {
-  const server = new McpServer({ name: 'skill-rails', version: '0.2.1' });
+  const server = new McpServer({ name: 'skill-rails', version: '0.2.2' });
 
   server.registerTool(
     'flow_start',
