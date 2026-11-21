@@ -40,7 +40,7 @@ export const parseWarnings = (stdout: string): string[] =>
 const envValue = (value: unknown): string => (Array.isArray(value) ? value.map(text).join('\n') : text(value));
 
 export function runCommand(command: string, { env = {}, dir, cwd, timeoutMs = TIMEOUT_MS }: RunOptions): RunResult {
-  const outputFile = path.join(os.tmpdir(), `skillflow-output-${crypto.randomUUID()}`);
+  const outputFile = path.join(os.tmpdir(), `skill-rails-output-${crypto.randomUUID()}`);
   fs.writeFileSync(outputFile, '');
   const values = Object.fromEntries(Object.entries(env).map(([key, value]) => [key, envValue(value)]));
   const result = spawnSync('bash', ['-eo', 'pipefail', '-c', command], {

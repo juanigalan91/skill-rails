@@ -1,10 +1,10 @@
 {
-  "name": "skillflow",
+  "name": "skill-rails",
   "version": "0.2.0",
-  "description": "Deterministic YAML flows for AI agent skills: the runner owns the order, the conditions and the shell steps, and hands the agent one step at a time.",
+  "description": "Deterministic, testable YAML flows for AI agent skills, in GitHub Actions syntax.",
   "type": "module",
   "license": "MIT",
-  "bin": "bin/skillflow.js",
+  "bin": "bin/skill-rails.js",
   "exports": {
     ".": {
       "types": "./dist/api.d.ts",
@@ -60,11 +60,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/juanigalan91/skillflow.git"
+    "url": "git+https://github.com/juanigalan91/skill-rails.git"
   },
-  "homepage": "https://github.com/juanigalan91/skillflow#readme",
+  "homepage": "https://github.com/juanigalan91/skill-rails#readme",
   "bugs": {
-    "url": "https://github.com/juanigalan91/skillflow/issues"
+    "url": "https://github.com/juanigalan91/skill-rails/issues"
   },
   "main": "./dist/api.js",
   "types": "./dist/api.d.ts",

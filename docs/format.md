@@ -85,7 +85,7 @@ A `run` step with `until` runs its command again until the condition is true: fo
 
 - In `until`, `steps.<id>` holds the result of the last run.
 - A run that fails (exit code not 0) ends the polling as a failure: report "not ready yet" in an output, not with the exit code.
-- The runner gives control back to the agent after 9 minutes (`SKILLFLOW_WAIT_SLICE_SECONDS`), so that one command stays under the tool timeout of the agent.
+- The runner gives control back to the agent after 9 minutes (`SKILL_RAILS_WAIT_SLICE_SECONDS`), so that one command stays under the tool timeout of the agent.
   The agent then gets a `wait` step: it reports it as done, with no output, and the polling goes on.
 
 ### `prompt`
@@ -252,5 +252,5 @@ Each command prints one JSON object.
 
 A result can also have `notes`: the warnings of the run steps, which the agent shows to the user.
 
-The state is a JSON file per flow name and working directory, in `$SKILLFLOW_STATE_DIR` (default: the system temp folder).
+The state is a JSON file per flow name and working directory, in `$SKILL_RAILS_STATE_DIR` (default: the system temp folder).
 `start` resets it.

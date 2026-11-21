@@ -1,15 +1,15 @@
 {
-  "name": "skillflow",
-  "description": "skillflow: deterministic YAML flows for agent skills",
+  "name": "skill-rails",
+  "description": "skill-rails: deterministic YAML flows for agent skills",
   "owner": {
     "name": "Juani Galán",
     "url": "https://github.com/juanigalan91"
   },
   "plugins": [
     {
-      "name": "skillflow",
+      "name": "skill-rails",
       "source": "./",
-      "description": "Deterministic YAML flows for agent skills: run, create and migrate skills to skillflow",
+      "description": "Deterministic YAML flows for agent skills: run, create and migrate skills to skill-rails",
       "version": "0.2.0"
     }
   ]

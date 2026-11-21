@@ -1,12 +1,12 @@
 # Testing flows
 
-`skillflow test` runs a flow for real, with fixed answers in place of the agent.
+`skill-rails test` runs a flow for real, with fixed answers in place of the agent.
 It needs no model, no network and no API key, so a test takes milliseconds and gives the same result every time.
 
 ```bash
-skillflow test                      # every *.test.yaml under the current folder
-skillflow test skills/open-pr       # one skill
-skillflow test --json               # the results as JSON, for CI
+skill-rails test                      # every *.test.yaml under the current folder
+skill-rails test skills/open-pr       # one skill
+skill-rails test --json               # the results as JSON, for CI
 ```
 
 ## A test file

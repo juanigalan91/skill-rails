@@ -30,7 +30,7 @@ const POLL_INTERVAL_SECONDS = 30;
 const POLL_TIMEOUT_MINUTES = 30;
 const RUN_TIMEOUT_MINUTES = 10;
 // A poll gives control back to the agent after this time, so that one done call stays under the tool timeout of the agent.
-const waitSliceMs = () => Number(process.env.SKILLFLOW_WAIT_SLICE_SECONDS ?? 540) * 1000;
+const waitSliceMs = () => Number(process.env.SKILL_RAILS_WAIT_SLICE_SECONDS ?? 540) * 1000;
 const sleep = (ms: number) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 
 export class InputError extends Error {

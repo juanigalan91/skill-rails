@@ -124,7 +124,7 @@ function withEnv<T>(env: Record<string, string | undefined>, fn: () => T): T {
 
 function prepare(test: TestCase, dir: string, cwd: string): void {
   if (test.fixture) fs.cpSync(path.resolve(dir, test.fixture), cwd, { recursive: true });
-  const git = (...args: string[]) => spawnSync('git', args, { cwd, encoding: 'utf8', env: { ...process.env, GIT_AUTHOR_NAME: 'skillflow', GIT_AUTHOR_EMAIL: 'test@skillflow', GIT_COMMITTER_NAME: 'skillflow', GIT_COMMITTER_EMAIL: 'test@skillflow' } });
+  const git = (...args: string[]) => spawnSync('git', args, { cwd, encoding: 'utf8', env: { ...process.env, GIT_AUTHOR_NAME: 'skill-rails', GIT_AUTHOR_EMAIL: 'test@skill-rails', GIT_COMMITTER_NAME: 'skill-rails', GIT_COMMITTER_EMAIL: 'test@skill-rails' } });
   if (test.git !== false) {
     git('init', '-q', '-b', 'main');
     git('add', '-A');
@@ -143,13 +143,13 @@ export function runTest(test: TestCase): TestResult {
   const trace: string[] = [];
   const result = (passed = failures.length === 0): TestResult => ({ name: test.name, file: test.file, passed, failures, trace, ms: Date.now() - began });
 
-  const stateDir = fs.mkdtempSync(path.join(os.tmpdir(), 'skillflow-state-'));
-  const cwd = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'skillflow-run-')));
+  const stateDir = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-rails-state-'));
+  const cwd = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'skill-rails-run-')));
   const vars = { cwd, dir };
   const pathPrefix = (test.path ?? []).map((p) => path.resolve(dir, p)).join(path.delimiter);
   const env = {
     ...substitute(test.env ?? {}, vars),
-    SKILLFLOW_STATE_DIR: stateDir,
+    SKILL_RAILS_STATE_DIR: stateDir,
     ...(pathPrefix ? { PATH: `${pathPrefix}${path.delimiter}${process.env.PATH ?? ''}` } : {}),
   };
 

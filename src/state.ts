@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import type { State } from './types.js';
 
-export const stateDir = (): string => process.env.SKILLFLOW_STATE_DIR ?? path.join(os.tmpdir(), 'skillflow');
+export const stateDir = (): string => process.env.SKILL_RAILS_STATE_DIR ?? path.join(os.tmpdir(), 'skill-rails');
 
 export function statePath(name: string, cwd: string): string {
   const hash = crypto.createHash('sha256').update(path.resolve(cwd)).digest('hex').slice(0, 12);

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Starts the PR body from the template, or from a short default.
 set -eo pipefail
-file="$(mktemp "${TMPDIR:-/tmp}/skillflow-pr-body.XXXXXX")"
+file="$(mktemp "${TMPDIR:-/tmp}/skill-rails-pr-body.XXXXXX")"
 if [ -n "$TEMPLATE" ]; then
   cp "$TEMPLATE" "$file"
 else

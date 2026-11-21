@@ -1,21 +1,21 @@
 ---
-name: run-skillflow
-description: "Run a skillflow flow file (flow.yaml) step by step: the runner gives one step at a time, you do it and report its output. Use when a skill tells you to run a flow, or when asked to run a skillflow flow."
+name: run-skill-rails
+description: "Run a skill-rails flow file (flow.yaml) step by step: the runner gives one step at a time, you do it and report its output. Use when a skill tells you to run a flow, or when asked to run a skill-rails flow."
 argument-hint: "<flow.yaml> [key=value ...]"
 ---
 
-# Run a skillflow flow
+# Run a skill-rails flow
 
 The runner decides the order of the steps, runs the shell steps itself, and checks each output that you report.
 You do only the step that it gives you, one at a time.
 
 Use the MCP tools `flow_start` and `flow_done` when they are available.
-Otherwise use the CLI: `npx -y skillflow@0.2 <command>`.
+Otherwise use the CLI: `npx -y skill-rails@0.2 <command>`.
 
 ## Step 1: Start
 
 ```bash
-npx -y skillflow@0.2 start <flow.yaml> [--input <key>=<value> ...]
+npx -y skill-rails@0.2 start <flow.yaml> [--input <key>=<value> ...]
 ```
 
 Give only the inputs that the caller or the invocation text gives.
@@ -29,7 +29,7 @@ Act on its `status`:
 - `step` → do the step (see "Step types"), then report its output:
 
   ```bash
-  npx -y skillflow@0.2 done <flow> <id> --output - <<'JSON'
+  npx -y skill-rails@0.2 done <flow> <id> --output - <<'JSON'
   {"title": "Add the flow runner"}
   JSON
   ```

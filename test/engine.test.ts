@@ -52,7 +52,7 @@ let file: string;
 beforeEach(() => {
   dir = tempDir({ 'flow.yaml': FLOW });
   file = path.join(dir, 'flow.yaml');
-  process.env.SKILLFLOW_STATE_DIR = path.join(dir, 'state');
+  process.env.SKILL_RAILS_STATE_DIR = path.join(dir, 'state');
 });
 
 describe('a flow run', () => {

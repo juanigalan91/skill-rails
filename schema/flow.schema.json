@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://raw.githubusercontent.com/juanigalan91/skillflow/main/schema/flow.schema.json",
-  "title": "skillflow flow",
+  "$id": "https://raw.githubusercontent.com/juanigalan91/skill-rails/main/schema/flow.schema.json",
+  "title": "skill-rails flow",
   "description": "A deterministic flow for an AI agent skill. The runner does the run and stop steps; the agent does the skill, prompt and ask steps, one at a time.",
   "type": "object",
   "required": [

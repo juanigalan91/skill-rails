@@ -1599,9 +1599,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"skillflow@workspace:.":
+"skill-rails@workspace:.":
   version: 0.0.0-use.local
-  resolution: "skillflow@workspace:."
+  resolution: "skill-rails@workspace:."
   dependencies:
     "@actions/expressions": "npm:^0.3.61"
     "@modelcontextprotocol/sdk": "npm:^1.32.2"
@@ -1613,7 +1613,7 @@ __metadata:
     vitest: "npm:^4.1.4"
     zod: "npm:^3.25.0"
   bin:
-    skillflow: bin/skillflow.js
+    skill-rails: bin/skill-rails.js
   languageName: unknown
   linkType: soft
 

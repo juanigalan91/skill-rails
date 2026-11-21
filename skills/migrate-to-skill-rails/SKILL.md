@@ -1,10 +1,10 @@
 ---
-name: migrate-to-skillflow
-description: "Migrate an existing Markdown skill (SKILL.md) to a skillflow flow: move the deterministic steps to scripts that the runner executes, keep only the judgment in agent steps, and compare the two versions. Use when asked to migrate, convert or port a skill to skillflow."
+name: migrate-to-skill-rails
+description: "Migrate an existing Markdown skill (SKILL.md) to a skill-rails flow: move the deterministic steps to scripts that the runner executes, keep only the judgment in agent steps, and compare the two versions. Use when asked to migrate, convert or port a skill to skill-rails."
 argument-hint: "<path of the skill folder or SKILL.md>"
 ---
 
-# Migrate a skill to skillflow
+# Migrate a skill to skill-rails
 
 Turns a Markdown skill into a flow skill, next to the original: `<name>-flow/` with `SKILL.md`, `flow.yaml`, `scripts/` and `prompts/`.
 Keep the original skill until the comparison in Step 6 shows that the flow gives the same result.
@@ -53,13 +53,13 @@ Make a list of each rule of the original skill and where it went.
 
 ## Step 4: Write the files
 
-Follow Step 3 of the `create-skillflow` skill for the file rules.
+Follow Step 3 of the `create-skill-rails` skill for the file rules.
 Never put `${{ }}` in a `run` command: pass the values with `env`.
 
 ## Step 5: Check
 
 ```bash
-npx -y skillflow@0.2 check <name>-flow/flow.yaml
+npx -y skill-rails@0.2 check <name>-flow/flow.yaml
 ```
 
 Then run the flow once in a safe place, for example a copy of the repository with a local remote, before a real run.

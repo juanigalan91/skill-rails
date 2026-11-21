@@ -6,17 +6,17 @@ allowed-tools: Bash, Read, Edit, Write
 
 # <Skill title>
 
-This skill runs `flow.yaml` with skillflow.
-Run the flow with the `run-skillflow` skill, or follow these steps.
+This skill runs `flow.yaml` with skill-rails.
+Run the flow with the `run-skill-rails` skill, or follow these steps.
 
 1. Start the flow:
 
    ```bash
-   npx -y skillflow@0.2 start "${CLAUDE_SKILL_DIR}/flow.yaml" [--input <key>=<value> ...]
+   npx -y skill-rails@0.2 start "${CLAUDE_SKILL_DIR}/flow.yaml" [--input <key>=<value> ...]
    ```
 
 2. Act on the `status` of each result:
-   - `step` → do the step, then run `npx -y skillflow@0.2 done <flow> <id> --output - <<'JSON' ... JSON` with an output that matches `output`.
+   - `step` → do the step, then run `npx -y skill-rails@0.2 done <flow> <id> --output - <<'JSON' ... JSON` with an output that matches `output`.
      For a `skill` step, invoke the skill with `args` first.
      For an `ask` step, ask the `questions` as they are, and report one property per question id.
    - `invalid` → correct the output and run `done` again.

@@ -3,14 +3,14 @@ import { check, done, reset, start, status } from './api.js';
 import type { Report } from './types.js';
 
 const USAGE = `Usage:
-  skillflow start <flow.yaml> [--input <key>=<value> ...]   check the flow, reset its state, print the first agent step
-  skillflow done <flow> <step-id> [--output <json> | -]     record the output of a step, print the next step
-  skillflow done <flow> <step-id> --fail <reason>           end the flow with an error
-  skillflow status <flow>                                   print the current step and the step results
-  skillflow reset <flow>                                    delete the state of a flow
-  skillflow check <flow.yaml>                               check a flow file without running it
-  skillflow test [<file or folder> ...] [--json]            run the *.test.yaml flow tests (default: the current folder)
-  skillflow mcp                                             run the MCP server on stdio`;
+  skill-rails start <flow.yaml> [--input <key>=<value> ...]   check the flow, reset its state, print the first agent step
+  skill-rails done <flow> <step-id> [--output <json> | -]     record the output of a step, print the next step
+  skill-rails done <flow> <step-id> --fail <reason>           end the flow with an error
+  skill-rails status <flow>                                   print the current step and the step results
+  skill-rails reset <flow>                                    delete the state of a flow
+  skill-rails check <flow.yaml>                               check a flow file without running it
+  skill-rails test [<file or folder> ...] [--json]            run the *.test.yaml flow tests (default: the current folder)
+  skill-rails mcp                                             run the MCP server on stdio`;
 
 function option(args: string[], name: string): string | undefined {
   const i = args.indexOf(`--${name}`);

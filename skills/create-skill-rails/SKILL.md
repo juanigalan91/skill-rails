@@ -1,10 +1,10 @@
 ---
-name: create-skillflow
-description: "Create a new agent skill as a skillflow flow: flow.yaml, scripts and prompt files, with the deterministic parts in code and only the judgment in agent steps. Use when asked to create, write or design a new skill with skillflow."
+name: create-skill-rails
+description: "Create a new agent skill as a skill-rails flow: flow.yaml, scripts and prompt files, with the deterministic parts in code and only the judgment in agent steps. Use when asked to create, write or design a new skill with skill-rails."
 argument-hint: "<what the skill does>"
 ---
 
-# Create a skill with skillflow
+# Create a skill with skill-rails
 
 Writes a new skill folder: `SKILL.md`, `flow.yaml`, `scripts/` and `prompts/`.
 Read `${CLAUDE_SKILL_DIR}/../../docs/format.md` first: it is the reference of the flow format.
@@ -60,7 +60,7 @@ Rules:
 ## Step 4: Check
 
 ```bash
-npx -y skillflow@0.2 check <skill folder>/flow.yaml
+npx -y skill-rails@0.2 check <skill folder>/flow.yaml
 ```
 
 Fix each error.

@@ -10,7 +10,7 @@ describe('the MCP server', () => {
     const dir = tempDir({
       'flow.yaml': "name: mcp\nsteps:\n  - id: a\n    prompt: Say hi.\n    output: { type: object, required: [text], properties: { text: { type: string } } }\n  - stop: '${{ steps.a.outputs.text }}'\n",
     });
-    process.env.SKILLFLOW_STATE_DIR = path.join(dir, 'state');
+    process.env.SKILL_RAILS_STATE_DIR = path.join(dir, 'state');
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
     await createServer({ cwd: dir }).connect(serverTransport);
     const client = new Client({ name: 'test', version: '0' });

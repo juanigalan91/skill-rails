@@ -14,7 +14,7 @@ const run = (files: Record<string, string>, inputs: Record<string, unknown> = {}
 const answer = (flow: string, id: string, output?: unknown) => done({ flow, id, output, cwd: dir });
 
 beforeEach(() => {
-  process.env.SKILLFLOW_STATE_DIR = tempDir();
+  process.env.SKILL_RAILS_STATE_DIR = tempDir();
 });
 
 describe('foreach', () => {
@@ -149,7 +149,7 @@ steps:
   });
 
   it('gives control back to the agent after a time slice, then goes on', () => {
-    process.env.SKILLFLOW_WAIT_SLICE_SECONDS = '0.01';
+    process.env.SKILL_RAILS_WAIT_SLICE_SECONDS = '0.01';
     try {
       const first = run({ 'flow.yaml': poll('1') }) as StepReport;
       expect(first).toMatchObject({ status: 'step', type: 'wait', id: 'wait' });
@@ -157,7 +157,7 @@ steps:
       for (let i = 0; i < 5 && report.status === 'step'; i++) report = answer('poll', 'wait');
       expect(report).toMatchObject({ status: 'done', message: 'ready after ready' });
     } finally {
-      delete process.env.SKILLFLOW_WAIT_SLICE_SECONDS;
+      delete process.env.SKILL_RAILS_WAIT_SLICE_SECONDS;
     }
   });
 });

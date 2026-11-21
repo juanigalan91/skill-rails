@@ -1,10 +1,10 @@
 <div align="center">
 
-# skillflow
+# skill-rails
 
 ### Stop hoping your agent follows the steps. Make it follow them.
 
-[![npm](https://img.shields.io/npm/v/skillflow.svg)](https://www.npmjs.com/package/skillflow)
+[![npm](https://img.shields.io/npm/v/skill-rails.svg)](https://www.npmjs.com/package/skill-rails)
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![node](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](package.json)
 
@@ -18,12 +18,12 @@ You wrote a great skill.
 It has twelve steps, four conditions, and one rule that must never break.
 Then the model skips step 7, runs `git log` five times, and invents a flag for `gh`.
 
-**skillflow turns a skill into a flow.**
+**skill-rails turns a skill into a flow.**
 Code does the steps that are always the same.
 The agent does only the steps that need judgment, one at a time.
 Every answer is checked against a schema before the flow goes on.
 
-| | Markdown skill | skillflow |
+| | Markdown skill | skill-rails |
 |---|---|---|
 | Order of the steps | The model remembers it | The runner enforces it |
 | `if` conditions and gates | The model reads them | `${{ }}` expressions, evaluated in code |
@@ -122,15 +122,15 @@ agent ◀── { status: done, message } ──
 
 ## Benchmarks
 
-Two skills, each run headless 3 times as a Markdown skill and as a skillflow flow, on the same input.
+Two skills, each run headless 3 times as a Markdown skill and as a skill-rails flow, on the same input.
 Both versions gave the same result in every run.
 
 | Skill | Version | Duration | Model turns | Cost |
 |-------|---------|----------|-------------|------|
 | A | Markdown | 37 s | 21 | $0.43 |
-| A | skillflow | 17–20 s | 7–8 | $0.25–0.28 |
+| A | skill-rails | 17–20 s | 7–8 | $0.25–0.28 |
 | B | Markdown | 38 s | 9 | $0.29 |
-| B | skillflow | 30 s | 8 | $0.21–0.25 |
+| B | skill-rails | 30 s | 8 | $0.21–0.25 |
 
 These are small samples on simple inputs.
 The gain is largest when a skill has many mechanical steps.
@@ -141,32 +141,32 @@ It is small when most of the work is research that only the model can do.
 As a Claude Code plugin, with the skills and the MCP server:
 
 ```text
-/plugin marketplace add juanigalan91/skillflow
-/plugin install skillflow@skillflow
+/plugin marketplace add juanigalan91/skill-rails
+/plugin install skill-rails@skill-rails
 ```
 
 As a CLI or a library (Node 20 or later):
 
 ```bash
-yarn add skillflow        # or: npx skillflow check flow.yaml
-yarn skillflow check flow.yaml
+yarn add skill-rails        # or: npx skill-rails check flow.yaml
+yarn skill-rails check flow.yaml
 ```
 
 ```ts
-import { start, done } from 'skillflow';
+import { start, done } from 'skill-rails';
 ```
 
 The MCP server works with any MCP client:
 
 ```json
-{ "mcpServers": { "skillflow": { "command": "npx", "args": ["-y", "skillflow@0.2", "mcp"] } } }
+{ "mcpServers": { "skill-rails": { "command": "npx", "args": ["-y", "skill-rails@0.2", "mcp"] } } }
 ```
 
 ## Use
 
-- **Run a flow:** the `run-skillflow` skill, the MCP tools `flow_start` and `flow_done`, or the CLI.
-- **Create a skill:** the `create-skillflow` skill designs the steps and writes `flow.yaml`, `scripts/` and `prompts/`.
-- **Migrate a skill:** the `migrate-to-skillflow` skill converts a Markdown skill, keeps every rule, and compares the two versions.
+- **Run a flow:** the `run-skill-rails` skill, the MCP tools `flow_start` and `flow_done`, or the CLI.
+- **Create a skill:** the `create-skill-rails` skill designs the steps and writes `flow.yaml`, `scripts/` and `prompts/`.
+- **Migrate a skill:** the `migrate-to-skill-rails` skill converts a Markdown skill, keeps every rule, and compares the two versions.
 
 A flow skill is a folder:
 
@@ -201,7 +201,7 @@ tests:
 ```
 
 ```text
-$ skillflow test
+$ skill-rails test
 ✓ interactive, new draft PR  (examples/open-pr/tests/open-pr.test.yaml, 2 agent steps, 1308 ms)
 ✓ unattended, no questions   (examples/open-pr/tests/open-pr.test.yaml, 1 agent steps, 640 ms)
 ✓ stops on the base branch   (examples/open-pr/tests/open-pr.test.yaml, 0 agent steps, 494 ms)
@@ -213,13 +213,13 @@ See [Testing flows](docs/testing.md).
 ## CLI
 
 ```text
-skillflow start <flow.yaml> [--input <key>=<value> ...]   check the flow, reset its state, print the first agent step
-skillflow done <flow> <step-id> [--output <json> | -]     record the output of a step, print the next step
-skillflow done <flow> <step-id> --fail <reason>           end the flow with an error
-skillflow status <flow>                                   print the current step and the step results
-skillflow reset <flow>                                    delete the state of a flow
-skillflow check <flow.yaml>                               check a flow file without running it
-skillflow mcp                                             run the MCP server on stdio
+skill-rails start <flow.yaml> [--input <key>=<value> ...]   check the flow, reset its state, print the first agent step
+skill-rails done <flow> <step-id> [--output <json> | -]     record the output of a step, print the next step
+skill-rails done <flow> <step-id> --fail <reason>           end the flow with an error
+skill-rails status <flow>                                   print the current step and the step results
+skill-rails reset <flow>                                    delete the state of a flow
+skill-rails check <flow.yaml>                               check a flow file without running it
+skill-rails mcp                                             run the MCP server on stdio
 ```
 
 ## Documentation
@@ -237,9 +237,9 @@ skillflow mcp                                             run the MCP server on 
 ## Related projects
 
 - [claude-workflow](https://github.com/AxGord/claude-workflow): YAML state machines that a Claude Code agent moves through with an MCP server.
-  skillflow adds schema-validated outputs, user questions, and the GitHub Actions syntax.
+  skill-rails adds schema-validated outputs, user questions, and the GitHub Actions syntax.
 - [Archon](https://github.com/coleam00/Archon) and [GitHub Agentic Workflows](https://github.com/github/gh-aw): the runner starts the agent.
-  In skillflow, the agent drives the runner from inside its own session.
+  In skill-rails, the agent drives the runner from inside its own session.
 - [Goose recipes](https://github.com/aaif-goose/goose): YAML recipes with structured output.
 
 ## Contributing

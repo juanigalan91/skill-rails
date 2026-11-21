@@ -4,14 +4,14 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { tempDir } from './helpers.js';
 
-const bin = path.join(path.dirname(path.dirname(fileURLToPath(import.meta.url))), 'bin', 'skillflow.js');
+const bin = path.join(path.dirname(path.dirname(fileURLToPath(import.meta.url))), 'bin', 'skill-rails.js');
 
 function cli(args: string[], { cwd, input }: { cwd: string; input?: string }) {
   const result = spawnSync(process.execPath, [bin, ...args], {
     cwd,
     input,
     encoding: 'utf8',
-    env: { ...process.env, SKILLFLOW_STATE_DIR: path.join(cwd, 'state') },
+    env: { ...process.env, SKILL_RAILS_STATE_DIR: path.join(cwd, 'state') },
   });
   return { code: result.status, json: JSON.parse(result.stdout) };
 }

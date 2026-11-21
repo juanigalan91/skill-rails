@@ -14,12 +14,12 @@ const LOOP =
   'Act on the status of the result: step → do the step, then call flow_done; invalid → correct the output and call flow_done again; done or failed → tell the user the message.';
 
 export function createServer({ cwd = process.cwd() }: { cwd?: string } = {}): McpServer {
-  const server = new McpServer({ name: 'skillflow', version: '0.2.0' });
+  const server = new McpServer({ name: 'skill-rails', version: '0.2.0' });
 
   server.registerTool(
     'flow_start',
     {
-      description: `Start a skillflow flow: check the flow file, reset its state, and get the first step to do. ${LOOP}`,
+      description: `Start a skill-rails flow: check the flow file, reset its state, and get the first step to do. ${LOOP}`,
       inputSchema: {
         file: z.string().describe('Path of the flow YAML file.'),
         inputs: z.record(z.string(), z.union([z.string(), z.boolean(), z.number()])).optional().describe('The flow inputs.'),
