@@ -69,6 +69,7 @@ describe('a flow run', () => {
       status: 'done',
       flow: 'demo',
       message: 'Summary: ok',
+      cwd: dir,
     });
   });
 

@@ -128,6 +128,8 @@ export interface PendingStep {
   instructions?: string;
   questions?: RenderedQuestion[];
   output?: JsonObject;
+  /** Earliest time to resume a polling step, in Unix milliseconds. */
+  retryAt?: number;
 }
 
 /** A running list of steps: the root flow, a sub-flow, or one iteration of a foreach. */
@@ -147,6 +149,7 @@ export interface Frame {
   iterations?: Array<{ item: unknown; steps: Record<string, StepResult> }>;
   /** run steps with until: when the polling started. */
   pollStarted?: number;
+  pollNextAt?: number;
 }
 
 export interface State {
@@ -187,10 +190,11 @@ export interface RunResult {
 export type Exec = (command: string, options: RunOptions) => RunResult;
 
 /** What the agent reads after each command. */
-export type Report =
+export type Report = (
   | ({ status: 'step'; flow: string; notes?: string[] } & PendingStep)
   | { status: 'done' | 'failed' | 'running'; flow: string; message: string | null; notes?: string[] }
   | { status: 'invalid'; id: string; errors: string[]; output?: JsonObject }
   | { status: 'error'; errors: string[] }
   | { status: 'ok'; flow: string; steps: number }
-  | { status: 'reset'; flow: string };
+  | { status: 'reset'; flow: string }
+) & { cwd?: string };

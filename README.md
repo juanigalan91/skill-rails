@@ -8,7 +8,7 @@
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![node](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](package.json)
 
-**2× faster · up to 40% cheaper · the same result, every run**
+**Enforced step order · validated outputs · fewer mechanical model turns**
 
 </div>
 
@@ -21,20 +21,27 @@ Then the model skips step 7, runs `git log` five times, and invents a flag for `
 **skill-rails turns a skill into a flow.**
 Code does the steps that are always the same.
 The agent does only the steps that need judgment, one at a time.
-Every answer is checked against a schema before the flow goes on.
+Agent outputs are checked against their declared JSON Schema before the flow goes on. Without an explicit schema, the runner checks only that the output is an object.
 
-| | Markdown skill | skill-rails |
+## Why use a flow instead of a Markdown-only skill?
+
+Markdown is a good format for instructions, examples, and judgment. A Markdown skill can already call scripts and keep references in separate files. skill-rails adds an executable contract for how those pieces run together.
+
+| Concern | Markdown-only skill | skill-rails flow |
 |---|---|---|
-| Order of the steps | The model remembers it | The runner enforces it |
-| `if` conditions and gates | The model reads them | `${{ }}` expressions, evaluated in code |
-| `git`, `gh`, checks, file operations | Model turns, tokens, mistakes | Scripts, with no model turn |
-| Values between steps | Free text in the context | JSON outputs, validated against a schema |
-| Questions to the user | Mixed into the prompt | Typed `ask` steps, with validated answers |
-| Loops, waits and reuse | "Do this for each comment", "wait for CI" | `foreach`, `run` with `until`, and `uses` to call another flow |
-| The skill file | One long prompt | `flow.yaml` + `scripts/` + `prompts/` that you can test and review |
+| Step order | The agent interprets and follows the sequence | The runner selects the next step and rejects submissions for a different step |
+| Conditions and gates | The agent evaluates the written rule or calls a script | Expressions decide which steps execute, including failure stops |
+| Mechanical work | The agent calls commands or a bundled script | Consecutive shell steps execute without a model turn between them |
+| Values between steps | The agent tracks values or reads script outputs | Named outputs are available to later expressions; agent outputs can have JSON Schemas |
+| User questions | The agent asks and interprets replies | `ask` defines the questions and validates submitted labels or free-text values |
+| Loops and reuse | Instructions or scripts describe the repetition | `foreach`, polling, and subflows make the control flow explicit |
+| Testing | Scripts can be tested; prompt behavior needs separate evaluation | Fixed agent answers let tests exercise branches, scripts, files, and outputs without a model |
+| Inspection and continuation | Depend on the host session and any custom scripts | `status` exposes saved progress and the pending step between calls |
+
+For a repeated release or PR workflow, this means a missing prerequisite can stop the flow in code, a malformed output can be rejected before the next command, and a branch can be regression-tested without paying for a model run. Prompts and reference material still belong in Markdown.
 
 The flow format is the GitHub Actions syntax that you already know: `steps`, `if: ${{ }}`, `run`, `env`, `$FLOW_OUTPUT`.
-It runs inside the session of your agent, with its context, its tools and its permissions: you add no new service and no API key.
+The agent drives the flow from its existing session: you add no new service and no API key. Shell steps execute in the runner process; with MCP, that process has its own configured environment and permissions.
 
 ## Before and after
 
@@ -111,7 +118,7 @@ What changes:
 - The gate "nothing to merge" is an `if:` that always runs, and the title is checked against `maxLength: 72`.
 - The flow can be tested with no model: see [Testing](#testing).
 
-The agent drives the loop from inside its own session, so the flow keeps the session context, the tools and the permissions of the agent:
+The agent drives the loop from inside its own session and uses its tools for agent steps. The runner executes shell steps:
 
 ```text
 agent ── start flow.yaml ──▶ runner  (runs the shell steps, then stops at the first agent step)
@@ -119,6 +126,34 @@ agent ◀── { status: step, instructions, output schema } ──
 agent ── done <step> <json> ──▶ runner  (validates the output, runs the next shell steps)
 agent ◀── { status: done, message } ──
 ```
+
+## Where the approach holds up—and where it does not
+
+### Why not just write a better Markdown skill?
+
+For a short task, that is often the better choice. A checklist is easy to read and change, and it leaves room to adapt when the work is exploratory. A flow becomes useful when the same sequence runs repeatedly and a missed gate, malformed value, or unnecessary tool call has a meaningful cost. Maintaining YAML, schemas, scripts, and tests needs to earn its place.
+
+### Why not just write a script?
+
+If all the work is mechanical, write a script. A Markdown skill that calls one well-tested script can already remove most of the model overhead. skill-rails helps when execution must alternate between code and judgment: collect context, ask the user, request a draft, validate its shape, then continue in code. Its value is coordinating those handoffs, rather than replacing shell scripts.
+
+### Does this make the agent deterministic?
+
+It makes the declared control flow explicit and runner-enforced. It does not guarantee identical model answers, correct reasoning, or identical results from commands that depend on networks, time, or changing repositories. A schema can check that a title is a string under 72 characters; it cannot establish that the title accurately describes the change. Add domain checks where possible and evaluate agent quality separately.
+
+### Can the agent still skip a rule or claim it did the work?
+
+The runner rejects out-of-order submissions and invalid outputs, but it trusts accepted agent reports. It cannot prove that a prompt was followed, that an answer really came from the user, or prevent the agent from acting outside the flow. It is workflow control, not a security boundary. Shell steps run with the runner process's permissions.
+
+### What happens after an interruption?
+
+Saved state lets the agent retrieve the pending step and continue between completed calls. It is not a transaction log or an exactly-once execution guarantee: a command can change an external system before the updated state is saved. Make side effects safe to retry or check whether they already happened. State is local, stored in a temporary directory by default, and keyed by project directory and flow name; concurrent runs of that same flow need separate state directories.
+
+### Will it always be faster or cheaper?
+
+No. Batching mechanical steps can reduce model turns, but each agent handoff still adds work, and research-heavy flows may gain little. The measurements below cover two small examples, not a general performance guarantee. Agent installation, tool timeouts, Bash availability, and skill discovery also vary; see [agent compatibility](docs/agents.md).
+
+Start with Markdown and scripts. Add a flow when repeated handoffs, gates, and testable branches justify the extra structure.
 
 ## Benchmarks
 
@@ -162,6 +197,10 @@ The MCP server works with any MCP client:
 { "mcpServers": { "skill-rails": { "command": "npx", "args": ["-y", "skill-rails@0.2", "mcp"] } } }
 ```
 
+## Other agents
+
+Codex, Cursor, Copilot in VS Code, Gemini CLI, and OpenCode can use the shared skills through the CLI or local MCP server. See [agent setup and compatibility](docs/agents.md) for configuration, current verification status, and a client smoke test. The new compatibility features require this checkout until released.
+
 ## Use
 
 - **Run a flow:** the `run-skill-rails` skill, the MCP tools `flow_start` and `flow_done`, or the CLI.
@@ -180,7 +219,7 @@ my-skill/
 
 ## Testing
 
-A flow is deterministic everywhere except in the agent steps, so you can test it with no model.
+You can test the runner’s control flow with no model by supplying fixed agent answers. Use fixtures and stub commands to control external dependencies; this does not evaluate the quality of real model answers.
 A test gives the answers that the agent would give, and the runner does the rest for real: scripts, conditions, outputs and files.
 
 ```yaml
@@ -226,6 +265,7 @@ skill-rails mcp                                             run the MCP server o
 
 - [The flow format](docs/format.md): steps, expressions, outputs, and the protocol.
 - [Testing flows](docs/testing.md): answers, fixtures, stubs and expectations.
+- [Agent compatibility](docs/agents.md): setup for other agents and verification.
 - [Examples](examples/): `hello` and `open-pr`.
 
 ## Security

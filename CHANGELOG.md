@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+- Portable runner, creation, migration and generated skill instructions, with chat fallbacks for questions.
+- Setup guides and a live verification checklist for Codex, Cursor, Copilot in VS Code, Gemini CLI and OpenCode v2.
+- `--cwd` selects the project for CLI and MCP commands; saved-state reports include the project directory.
+- Polling uses 20-second slices by default, bounds individual checks to the remaining slice, and preserves the next check time in a `retryAt` wait report. Slow polling checks may now time out; adjust `SKILL_RAILS_WAIT_SLICE_SECONDS` if needed.
+
+## 0.2.1
+
+- Fix: under `npx` or `npm exec`, the CLI and the MCP server ran in the nearest folder with a `package.json`.
+  They now use `INIT_CWD`, the folder where the command started, for the flow paths, the `run` steps and the state.
+
 ## 0.2.0
 
 The first public release.

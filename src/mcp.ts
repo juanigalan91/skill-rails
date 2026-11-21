@@ -1,4 +1,5 @@
 // The MCP server: the same commands as the CLI, as tools. The working directory of the server is the project.
+import path from 'node:path';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
@@ -14,7 +15,7 @@ const LOOP =
   'Act on the status of the result: step → do the step, then call flow_done; invalid → correct the output and call flow_done again; done or failed → tell the user the message.';
 
 export function createServer({ cwd = process.cwd() }: { cwd?: string } = {}): McpServer {
-  const server = new McpServer({ name: 'skill-rails', version: '0.2.0' });
+  const server = new McpServer({ name: 'skill-rails', version: '0.2.1' });
 
   server.registerTool(
     'flow_start',
@@ -25,7 +26,7 @@ export function createServer({ cwd = process.cwd() }: { cwd?: string } = {}): Mc
         inputs: z.record(z.string(), z.union([z.string(), z.boolean(), z.number()])).optional().describe('The flow inputs.'),
       },
     },
-    async ({ file, inputs }) => reply(start({ file, inputs, cwd })),
+    async ({ file, inputs }) => reply(start({ file: path.resolve(cwd, file), inputs, cwd })),
   );
 
   server.registerTool(
@@ -57,12 +58,12 @@ export function createServer({ cwd = process.cwd() }: { cwd?: string } = {}): Mc
   server.registerTool(
     'flow_check',
     { description: 'Check a flow file without running it.', inputSchema: { file: z.string() } },
-    async ({ file }) => reply(check({ file })),
+    async ({ file }) => reply(check({ file: path.resolve(cwd, file) })),
   );
 
   return server;
 }
 
-export async function serve(): Promise<void> {
-  await createServer().connect(new StdioServerTransport());
+export async function serve(cwd = process.cwd()): Promise<void> {
+  await createServer({ cwd }).connect(new StdioServerTransport());
 }

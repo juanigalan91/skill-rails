@@ -9,6 +9,8 @@ argument-hint: "<flow.yaml> [key=value ...]"
 The runner decides the order of the steps, runs the shell steps itself, and checks each output that you report.
 You do only the step that it gives you, one at a time.
 
+Resolve the caller’s flow path relative to its SKILL.md when it supplies a relative link. Use the intended project directory for execution and state; with the CLI, add `--cwd <project-directory>` to each command if needed. With MCP, the server must be configured for that project.
+
 Use the MCP tools `flow_start` and `flow_done` when they are available.
 Otherwise use the CLI: `npx -y skill-rails@0.2 <command>`.
 
@@ -45,13 +47,13 @@ When the object has `notes`, tell them to the user.
 ### Step types
 
 - `prompt` → do `instructions`.
-- `skill` → invoke `skill` with `args`, then do `instructions`.
+- `skill` → load and follow the named `skill` with `args` using the host’s supported mechanism, then do `instructions`. If unavailable, report the step with `--fail`; do not silently substitute another skill.
   If the skill tells you to stop, report the step with `--fail`.
-- `ask` → ask the user `questions` as they are, with your question tool, with each option `preview`.
+- `ask` → ask the user `questions` as they are, including option descriptions and each `preview`. Use a native question tool when it can represent the question; otherwise ask in chat. Wait for the user’s reply before reporting an answer. Never infer approval or invent a selection.
   Report one property per question `id`: the selected label, or the list of labels for `multiSelect`.
   A question with `free: true` takes free text: ask it in a normal message, wait for the reply, and report the reply as text.
 - `wait` → a step polls a command and needs more time.
-  Run `done <flow> <id>` again with no output, with a tool timeout of 10 minutes.
+  Wait until `retryAt` (Unix milliseconds), using the host’s wait mechanism, then run `done <flow> <id>` with no output. If the host cannot wait automatically, hand control back and resume when the user returns.
 
 `output` is the JSON Schema of the output: report a JSON object that matches it.
 

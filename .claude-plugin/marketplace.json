@@ -10,7 +10,7 @@
       "name": "skill-rails",
       "source": "./",
       "description": "Deterministic YAML flows for agent skills: run, create and migrate skills to skill-rails",
-      "version": "0.2.0"
+      "version": "0.2.1"
     }
   ]
 }
