@@ -1,6 +1,6 @@
 {
   "name": "skill-rails",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Deterministic, testable YAML flows for AI agent skills, in GitHub Actions syntax.",
   "type": "module",
   "license": "MIT",

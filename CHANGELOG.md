@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.3
 
 - Run the bundled create and migrate skills as YAML flows, with shared scaffolding, deterministic validation/tests, and repair and failure gates.
 - Migrate existing skills in place without generating backups or sibling copies.
