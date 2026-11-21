@@ -1,0 +1,63 @@
+name: create-skill-rails
+inputs:
+  request: { type: string, required: true, description: "The user's skill request, verbatim." }
+  target: { type: string, description: "Explicit destination directory, when supplied." }
+  source: { type: string, description: Original skill directory for a migration. }
+  auto: { type: boolean, default: false, description: Explicit unattended mode; never ask questions. }
+steps:
+  - id: plan
+    prompt-file: prompts/plan.md
+    output:
+      type: object
+      additionalProperties: false
+      required: [name, description, target, steps]
+      properties:
+        name: { type: string, pattern: '^[a-z][a-z0-9]*(-[a-z0-9]+)*$' }
+        description: { type: string, minLength: 1 }
+        target: { type: string, minLength: 1 }
+        steps:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [id, type, purpose]
+            properties:
+              id: { type: string, minLength: 1 }
+              type: { enum: [run, prompt, skill, ask, stop, foreach, uses, break] }
+              purpose: { type: string, minLength: 1 }
+  - id: scaffold
+    run: node "$FLOW_DIR/scripts/scaffold.mjs"
+    env:
+      TARGET: ${{ inputs.target || steps.plan.outputs.target }}
+      NAME: ${{ steps.plan.outputs.name }}
+      DESCRIPTION: ${{ steps.plan.outputs.description }}
+  - id: author
+    prompt-file: prompts/author.md
+  - id: check
+    run: node "$FLOW_DIR/scripts/validate.mjs"
+    env:
+      TARGET: ${{ steps.scaffold.outputs.target }}
+      SOURCE: ${{ inputs.source }}
+  - id: fix
+    if: ${{ steps.check.outputs.valid != 'true' }}
+    prompt-file: prompts/fix.md
+  - id: recheck
+    if: ${{ steps.check.outputs.valid != 'true' }}
+    run: node "$FLOW_DIR/scripts/validate.mjs"
+    env:
+      TARGET: ${{ steps.scaffold.outputs.target }}
+      SOURCE: ${{ inputs.source }}
+  - if: ${{ steps.check.outputs.valid != 'true' && steps.recheck.outputs.valid != 'true' }}
+    stop: 'Validation failed for ${{ steps.scaffold.outputs.target }}. ${{ steps.recheck.outputs.errors }}'
+    outcome: failure
+  - id: smoke
+    prompt-file: prompts/smoke.md
+    output:
+      type: object
+      required: [report, files, codeSteps, agentSteps]
+      properties:
+        report: { type: string, minLength: 1 }
+        files: { type: array, items: { type: string }, minItems: 1 }
+        codeSteps: { type: integer, minimum: 0 }
+        agentSteps: { type: integer, minimum: 0 }
+  - stop: '${{ steps.smoke.outputs.report }}'

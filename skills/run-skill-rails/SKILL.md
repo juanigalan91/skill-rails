@@ -6,6 +6,8 @@ argument-hint: "<flow.yaml> [key=value ...]"
 
 # Run a skill-rails flow
 
+This skill is the Markdown bootstrap for driving flows, including the create and migrate skills. It stays outside a flow so invoking the runner does not recurse into itself.
+
 The runner decides the order of the steps, runs the shell steps itself, and checks each output that you report.
 You do only the step that it gives you, one at a time.
 

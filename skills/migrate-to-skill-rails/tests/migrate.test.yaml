@@ -1,0 +1,342 @@
+flow: ../flow.yaml
+git: false
+path:
+  - ../../create-skill-rails/tests/stubs
+setup: |-
+  mkdir original
+  cat > original/SKILL.md <<'ORIGINAL'
+  ---
+  name: original
+  description: Original fixture.
+  ---
+  Report generated safely.
+  ORIGINAL
+inputs:
+  source: '{{cwd}}/original'
+  auto: true
+tests:
+  - name: migrates through the creation subflow and retains the original
+    answers:
+      audit:
+        brief: Migrate the safe stop.
+        rules:
+          - rule: Report generated safely.
+            destination: flow.yaml finish stop
+      plan:
+        name: generated
+        description: A sample generated skill.
+        target: '{{cwd}}/original-flow'
+        steps:
+          - id: finish
+            type: stop
+            purpose: Finish safely.
+      author:
+        $files:
+          original-flow/flow.yaml: |
+            name: generated
+            steps:
+              - stop: generated safely
+          original-flow/tests/generated.test.yaml: |
+            flow: ../flow.yaml
+            git: false
+            expect:
+              status: done
+              message: generated safely
+          original-flow/RULES.md: |
+            Report generated safely -> flow.yaml finish stop
+      smoke:
+        report: Created and safely exercised generated.
+        files:
+          - SKILL.md
+          - flow.yaml
+        codeSteps: 1
+        agentSteps: 0
+    expect:
+      status: done
+      message: /Original retained/
+      steps:
+        create: success
+        consent: skipped
+        compare: skipped
+      files:
+        original/SKILL.md: |
+          ---
+          name: original
+          description: Original fixture.
+          ---
+          Report generated safely.
+        original-flow/RULES.md: exists
+  - name: accepts a SKILL.md source path
+    inputs:
+      source: '{{cwd}}/original/SKILL.md'
+      auto: true
+    answers:
+      audit:
+        brief: Migrate the safe stop.
+        rules:
+          - rule: Report generated safely.
+            destination: flow.yaml finish stop
+      plan:
+        name: generated
+        description: A sample generated skill.
+        target: '{{cwd}}/original-flow'
+        steps:
+          - id: finish
+            type: stop
+            purpose: Finish safely.
+      author:
+        $files:
+          original-flow/flow.yaml: |
+            name: generated
+            steps:
+              - stop: generated safely
+          original-flow/tests/generated.test.yaml: |
+            flow: ../flow.yaml
+            git: false
+            expect:
+              status: done
+              message: generated safely
+          original-flow/RULES.md: |
+            Report generated safely -> flow.yaml finish stop
+      smoke:
+        report: Created and safely exercised generated.
+        files:
+          - SKILL.md
+          - flow.yaml
+        codeSteps: 1
+        agentSteps: 0
+    expect:
+      status: done
+      files:
+        original/SKILL.md: |
+          ---
+          name: original
+          description: Original fixture.
+          ---
+          Report generated safely.
+  - name: never offers a paid comparison in unattended mode
+    inputs:
+      source: '{{cwd}}/original'
+      auto: true
+      compare: true
+    answers:
+      audit:
+        brief: Migrate the safe stop.
+        rules:
+          - rule: Report generated safely.
+            destination: flow.yaml finish stop
+      plan:
+        name: generated
+        description: A sample generated skill.
+        target: '{{cwd}}/original-flow'
+        steps:
+          - id: finish
+            type: stop
+            purpose: Finish safely.
+      author:
+        $files:
+          original-flow/flow.yaml: |
+            name: generated
+            steps:
+              - stop: generated safely
+          original-flow/tests/generated.test.yaml: |
+            flow: ../flow.yaml
+            git: false
+            expect:
+              status: done
+              message: generated safely
+          original-flow/RULES.md: |
+            Report generated safely -> flow.yaml finish stop
+      smoke:
+        report: Created and safely exercised generated.
+        files:
+          - SKILL.md
+          - flow.yaml
+        codeSteps: 1
+        agentSteps: 0
+    expect:
+      status: done
+      steps:
+        consent: skipped
+        compare: skipped
+  - name: skips a live comparison when the user declines
+    inputs:
+      source: '{{cwd}}/original'
+      compare: true
+    answers:
+      audit:
+        brief: Migrate the safe stop.
+        rules:
+          - rule: Report generated safely.
+            destination: flow.yaml finish stop
+      plan:
+        name: generated
+        description: A sample generated skill.
+        target: '{{cwd}}/original-flow'
+        steps:
+          - id: finish
+            type: stop
+            purpose: Finish safely.
+      author:
+        $files:
+          original-flow/flow.yaml: |
+            name: generated
+            steps:
+              - stop: generated safely
+          original-flow/tests/generated.test.yaml: |
+            flow: ../flow.yaml
+            git: false
+            expect:
+              status: done
+              message: generated safely
+          original-flow/RULES.md: |
+            Report generated safely -> flow.yaml finish stop
+      smoke:
+        report: Created and safely exercised generated.
+        files:
+          - SKILL.md
+          - flow.yaml
+        codeSteps: 1
+        agentSteps: 0
+      consent:
+        answer: Skip
+    expect:
+      status: done
+      steps:
+        consent: success
+        compare: skipped
+  - name: runs comparison only after explicit consent
+    inputs:
+      source: '{{cwd}}/original'
+      compare: true
+    answers:
+      audit:
+        brief: Migrate the safe stop.
+        rules:
+          - rule: Report generated safely.
+            destination: flow.yaml finish stop
+      plan:
+        name: generated
+        description: A sample generated skill.
+        target: '{{cwd}}/original-flow'
+        steps:
+          - id: finish
+            type: stop
+            purpose: Finish safely.
+      author:
+        $files:
+          original-flow/flow.yaml: |
+            name: generated
+            steps:
+              - stop: generated safely
+          original-flow/tests/generated.test.yaml: |
+            flow: ../flow.yaml
+            git: false
+            expect:
+              status: done
+              message: generated safely
+          original-flow/RULES.md: |
+            Report generated safely -> flow.yaml finish stop
+      smoke:
+        report: Created and safely exercised generated.
+        files:
+          - SKILL.md
+          - flow.yaml
+        codeSteps: 1
+        agentSteps: 0
+      consent:
+        answer: Compare
+      compare:
+        report: Compared three safe runs per version; metrics unavailable.
+    expect:
+      status: done
+      steps:
+        compare: success
+      message: /Compared three safe runs/
+  - name: refuses to overwrite an existing migration
+    setup: |-
+      mkdir original original-flow
+      printf 'keep original' > original/SKILL.md
+      printf 'keep migration' > original-flow/SKILL.md
+    answers: {}
+    expect:
+      status: failed
+      message: /Destination already exists/
+      files:
+        original/SKILL.md: keep original
+        original-flow/SKILL.md: keep migration
+  - name: fails on a missing source
+    inputs:
+      source: '{{cwd}}/missing'
+    answers: {}
+    expect:
+      status: failed
+      steps:
+        audit: not reached
+  - name: propagates subflow failure before comparison
+    inputs:
+      source: '{{cwd}}/original'
+      compare: true
+    answers:
+      audit:
+        brief: Migrate the safe stop.
+        rules:
+          - rule: Report generated safely.
+            destination: flow.yaml finish stop
+      plan:
+        name: generated
+        description: A sample generated skill.
+        target: '{{cwd}}/original-flow'
+        steps:
+          - id: finish
+            type: stop
+            purpose: Finish safely.
+      author:
+        $fail: Cannot preserve a required rule.
+    expect:
+      status: failed
+      message: /Cannot preserve a required rule/
+      steps:
+        consent: not reached
+      files:
+        original/SKILL.md: |
+          ---
+          name: original
+          description: Original fixture.
+          ---
+          Report generated safely.
+  - name: requires the written rule audit before smoke testing
+    answers:
+      audit:
+        brief: Migrate the safe stop.
+        rules:
+          - rule: Report generated safely.
+            destination: flow.yaml finish stop
+      plan:
+        name: generated
+        description: A sample generated skill.
+        target: '{{cwd}}/original-flow'
+        steps:
+          - id: finish
+            type: stop
+            purpose: Finish safely.
+      author:
+        $files:
+          original-flow/flow.yaml: |
+            name: generated
+            steps:
+              - stop: generated safely
+          original-flow/tests/generated.test.yaml: |
+            flow: ../flow.yaml
+            git: false
+            expect:
+              status: done
+              message: generated safely
+      fix: {}
+    expect:
+      status: failed
+      message: /RULES.md is missing/
+      steps:
+        consent: not reached
+      files:
+        original/SKILL.md: /Report generated safely/

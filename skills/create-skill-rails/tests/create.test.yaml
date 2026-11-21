@@ -1,0 +1,276 @@
+flow: ../flow.yaml
+git: false
+path:
+  - stubs
+inputs:
+  request: Create a safe fixture skill.
+  target: '{{cwd}}/generated'
+  auto: true
+tests:
+  - name: creates, validates and tests a skill
+    answers:
+      plan:
+        name: generated
+        description: A sample generated skill.
+        target: '{{cwd}}/generated'
+        steps:
+          - id: finish
+            type: stop
+            purpose: Finish safely.
+      author:
+        $files:
+          generated/flow.yaml: |
+            name: generated
+            steps:
+              - stop: generated safely
+          generated/tests/generated.test.yaml: |
+            flow: ../flow.yaml
+            git: false
+            expect:
+              status: done
+              message: generated safely
+      smoke:
+        report: Created and safely exercised generated.
+        files:
+          - SKILL.md
+          - flow.yaml
+        codeSteps: 1
+        agentSteps: 0
+    expect:
+      status: done
+      message: Created and safely exercised generated.
+      steps:
+        scaffold: success
+        check: success
+        fix: skipped
+        recheck: skipped
+      files:
+        generated/SKILL.md: '/name: generated/'
+        generated/flow.yaml: |
+          name: generated
+          steps:
+            - stop: generated safely
+  - name: repairs an invalid flow before smoke testing
+    answers:
+      plan:
+        name: generated
+        description: A sample generated skill.
+        target: '{{cwd}}/generated'
+        steps:
+          - id: finish
+            type: stop
+            purpose: Finish safely.
+      author:
+        $files:
+          generated/flow.yaml: |
+            name: generated
+            steps: []
+      fix:
+        $files:
+          generated/flow.yaml: |
+            name: generated
+            steps:
+              - stop: generated safely
+          generated/tests/generated.test.yaml: |
+            flow: ../flow.yaml
+            git: false
+            expect:
+              status: done
+              message: generated safely
+      smoke:
+        report: Created and safely exercised generated.
+        files:
+          - SKILL.md
+          - flow.yaml
+        codeSteps: 1
+        agentSteps: 0
+    expect:
+      status: done
+      steps:
+        fix: success
+        recheck: success
+      outputs:
+        recheck.valid: 'true'
+  - name: blocks smoke testing when repairs still fail
+    answers:
+      plan:
+        name: generated
+        description: A sample generated skill.
+        target: '{{cwd}}/generated'
+        steps:
+          - id: finish
+            type: stop
+            purpose: Finish safely.
+      author:
+        $files:
+          generated/flow.yaml: |
+            name: generated
+            steps: []
+      fix: {}
+    expect:
+      status: failed
+      message: /Validation failed/
+      outputs:
+        recheck.valid: 'false'
+      steps:
+        smoke: not reached
+  - name: requires deterministic tests
+    answers:
+      plan:
+        name: generated
+        description: A sample generated skill.
+        target: '{{cwd}}/generated'
+        steps:
+          - id: finish
+            type: stop
+            purpose: Finish safely.
+      author:
+        $files:
+          generated/flow.yaml: |
+            name: generated
+            steps:
+              - stop: generated safely
+      fix: {}
+    expect:
+      status: failed
+      message: /Validation failed/
+      steps:
+        smoke: not reached
+  - name: does not overwrite an existing destination
+    setup: mkdir generated; echo keep > generated/SKILL.md
+    answers:
+      plan:
+        name: generated
+        description: A sample generated skill.
+        target: '{{cwd}}/generated'
+        steps:
+          - id: finish
+            type: stop
+            purpose: Finish safely.
+    expect:
+      status: failed
+      message: /Destination already exists/
+      files:
+        generated/SKILL.md: |
+          keep
+      steps:
+        author: not reached
+  - name: propagates an authoring failure
+    answers:
+      plan:
+        name: generated
+        description: A sample generated skill.
+        target: '{{cwd}}/generated'
+        steps:
+          - id: finish
+            type: stop
+            purpose: Finish safely.
+      author:
+        $fail: Missing required access.
+    expect:
+      status: failed
+      message: Missing required access.
+      steps:
+        check: not reached
+  - name: treats metacharacters in a target as a literal path
+    inputs:
+      request: Create a safe fixture skill.
+      target: '{{cwd}}/literal;$(touch injected) ''quoted'''
+      auto: true
+    answers:
+      plan:
+        name: generated
+        description: A sample generated skill.
+        target: '{{cwd}}/generated'
+        steps:
+          - id: finish
+            type: stop
+            purpose: Finish safely.
+      author:
+        $files:
+          literal;$(touch injected) 'quoted'/flow.yaml: |
+            name: generated
+            steps:
+              - stop: generated safely
+          literal;$(touch injected) 'quoted'/tests/generated.test.yaml: |
+            flow: ../flow.yaml
+            git: false
+            expect:
+              status: done
+              message: generated safely
+      smoke:
+        report: Created and safely exercised generated.
+        files:
+          - SKILL.md
+          - flow.yaml
+        codeSteps: 1
+        agentSteps: 0
+    expect:
+      status: done
+      files:
+        injected: absent
+        literal;$(touch injected) 'quoted'/SKILL.md: exists
+  - name: allows an interactive plan without adding an approval gate
+    inputs:
+      request: Create a safe fixture skill.
+      target: '{{cwd}}/generated'
+      auto: false
+    answers:
+      plan:
+        name: generated
+        description: A sample generated skill.
+        target: '{{cwd}}/generated'
+        steps:
+          - id: finish
+            type: stop
+            purpose: Finish safely.
+      author:
+        $files:
+          generated/flow.yaml: |
+            name: generated
+            steps:
+              - stop: generated safely
+          generated/tests/generated.test.yaml: |
+            flow: ../flow.yaml
+            git: false
+            expect:
+              status: done
+              message: generated safely
+      smoke:
+        report: Created and safely exercised generated.
+        files:
+          - SKILL.md
+          - flow.yaml
+        codeSteps: 1
+        agentSteps: 0
+    expect:
+      status: done
+      steps:
+        check: success
+  - name: stops when a safe smoke run is unavailable
+    answers:
+      plan:
+        name: generated
+        description: A sample generated skill.
+        target: '{{cwd}}/generated'
+        steps:
+          - id: finish
+            type: stop
+            purpose: Finish safely.
+      author:
+        $files:
+          generated/flow.yaml: |
+            name: generated
+            steps:
+              - stop: generated safely
+          generated/tests/generated.test.yaml: |
+            flow: ../flow.yaml
+            git: false
+            expect:
+              status: done
+              message: generated safely
+      smoke:
+        $fail: Cannot safely exercise the external integration.
+    expect:
+      status: failed
+      message: Cannot safely exercise the external integration.

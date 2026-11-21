@@ -214,7 +214,9 @@ Codex, Cursor, Copilot in VS Code, Gemini CLI, and OpenCode can use the shared s
 
 - **Run a flow:** the `run-skill-rails` skill, the MCP tools `flow_start` and `flow_done`, or the CLI.
 - **Create a skill:** the `create-skill-rails` skill designs the steps and writes `flow.yaml`, `scripts/` and `prompts/`.
-- **Migrate a skill:** the `migrate-to-skill-rails` skill converts a Markdown skill, keeps every rule, and compares the two versions.
+- **Migrate a skill:** the `migrate-to-skill-rails` skill audits the original rules and reuses the creation flow to write a sibling flow skill. Live comparisons are optional and require cost consent.
+
+The bundled create and migrate skills run their own YAML flows. Scripts scaffold a fresh destination, validate the generated flow, and run its deterministic tests; prompts handle design, authoring, repairs, and safe smoke runs. The runner skill stays as the Markdown bootstrap. See the [migration audit](docs/skill-migration/README.md).
 
 A flow skill is a folder:
 

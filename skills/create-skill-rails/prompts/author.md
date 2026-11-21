@@ -1,0 +1,17 @@
+Write the skill in `${{ steps.scaffold.outputs.target }}` using this plan:
+${{ toJSON(steps.plan.outputs.steps) }}
+
+Request: ${{ inputs.request }}
+Original skill, if migrating: ${{ inputs.source }}
+
+The runner already created scripts/, prompts/, tests/, and SKILL.md from the packaged template. Finish the wrapper's inputs and instructions without moving the folder. Keep the bootstrap protocol, relative flow resolution, project directory, schema recovery, failure handling, questions that wait for the user, and polling retryAt behavior.
+
+- flow.yaml holds the order, conditions, and inputs. Use run: <script>.sh and prompt-file: prompts/<id>.md.
+- Shell scripts start with #!/usr/bin/env bash and set -eo pipefail. Make them executable. Outputs use FLOW_OUTPUT (key=value or multiline delimiters); user notes use ::warning::.
+- Never interpolate expressions into run commands. Pass values through env instead: the format checker rejects expressions in run.
+- Prompts may interpolate previous outputs with the documented expression syntax. Keep schemas to the values used by later steps or the final report.
+- Every ask option needs a label and description. Unattended paths cannot ask questions.
+- Add deterministic *.test.yaml cases for the main path and relevant gates/failures. Use disposable fixtures and stub external commands. Tests must never push, publish, send messages, or create real remote resources. The runner will execute these tests automatically, so stub side effects before reporting this step done.
+- For a migration, write RULES.md mapping every original rule to a flow step, script, or prompt, including preserved references. Leave the original directory and all its files unchanged.
+
+Report completion only after the files are ready for the runner's check. If you cannot complete the work, fail the step with the reason.

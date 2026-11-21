@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Run the bundled create and migrate skills as YAML flows, with shared scaffolding, deterministic validation/tests, repair and failure gates, and optional comparison consent.
+- Add flow scenarios and a rule-preservation audit; retain the runner skill as the Markdown bootstrap.
+
 ## 0.2.2
 
 - Add native Codex plugin packaging: portable manifests, a Codex compatibility manifest, and a repository marketplace sharing the existing skills and MCP runner.
