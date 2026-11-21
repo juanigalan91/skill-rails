@@ -17,7 +17,7 @@ This table describes setup targets, not certified client behavior. Copilot cloud
 
 ## Use the current checkout
 
-Native Codex plugin packaging is available in this checkout and will ship in the next npm release. The underlying runner is already available as `skill-rails@0.2.1`. To try local runner changes, build this checkout:
+Native Codex plugin packaging is included from `skill-rails@0.2.2`. To try local runner changes, build this checkout:
 
 ```bash
 yarn install --immutable
@@ -38,7 +38,7 @@ codex plugin marketplace add /absolute/path/to/skill-rails
 codex plugin add skill-rails@skill-rails
 ```
 
-After these changes merge into the GitHub repository, the remote installation is:
+Install directly from the GitHub repository:
 
 ```bash
 codex plugin marketplace add juanigalan91/skill-rails

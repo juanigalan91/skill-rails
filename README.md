@@ -180,14 +180,14 @@ As a Claude Code plugin, with the skills and the MCP server:
 /plugin install skill-rails@skill-rails
 ```
 
-As a Codex plugin (from a checkout until the packaging changes merge):
+As a Codex plugin:
 
 ```bash
-codex plugin marketplace add /absolute/path/to/skill-rails
+codex plugin marketplace add juanigalan91/skill-rails
 codex plugin add skill-rails@skill-rails
 ```
 
-This installs the three skills and the local MCP configuration. See [Codex setup](docs/agents.md#codex) for GitHub installation and client requirements.
+This installs the three skills and the local MCP configuration. See [Codex setup](docs/agents.md#codex) for local installation and client requirements.
 
 As a CLI or a library (Node 20 or later):
 
@@ -208,7 +208,7 @@ The MCP server works with any MCP client:
 
 ## Other agents
 
-Codex, Cursor, Copilot in VS Code, Gemini CLI, and OpenCode can use the shared skills through the CLI or local MCP server. See [agent setup and compatibility](docs/agents.md) for configuration, current verification status, and a client smoke test. Native Codex plugin packaging is available in this checkout until the next release.
+Codex, Cursor, Copilot in VS Code, Gemini CLI, and OpenCode can use the shared skills through the CLI or local MCP server. See [agent setup and compatibility](docs/agents.md) for configuration, current verification status, and a client smoke test. Native Codex plugin packaging is included from version 0.2.2.
 
 ## Use
 

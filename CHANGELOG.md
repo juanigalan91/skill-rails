@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.2
 
 - Add native Codex plugin packaging: portable manifests, a Codex compatibility manifest, and a repository marketplace sharing the existing skills and MCP runner.
 - Include the plugin metadata and marketplace in the npm package, with a packaging regression check and installation guide.
