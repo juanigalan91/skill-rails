@@ -21,7 +21,7 @@ const errorReport = (error: unknown): Report => ({
 });
 
 function save(state: State): Report {
-  const result = report(state);
+  const result = { ...report(state), cwd: state.cwd };
   writeState(state);
   return result;
 }
@@ -66,7 +66,7 @@ export function done({
 export function status({ flow, cwd = process.cwd() }: { flow: string; cwd?: string }): Report | (Report & { results: Record<string, StepResult> }) {
   try {
     const state = readState(flow, cwd);
-    return { ...report(state), results: rootResults(state) };
+    return { ...report(state), cwd: state.cwd, results: rootResults(state) };
   } catch (error) {
     return errorReport(error);
   }

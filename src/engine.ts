@@ -30,7 +30,10 @@ const POLL_INTERVAL_SECONDS = 30;
 const POLL_TIMEOUT_MINUTES = 30;
 const RUN_TIMEOUT_MINUTES = 10;
 // A poll gives control back to the agent after this time, so that one done call stays under the tool timeout of the agent.
-const waitSliceMs = () => Number(process.env.SKILL_RAILS_WAIT_SLICE_SECONDS ?? 540) * 1000;
+const waitSliceMs = () => {
+  const seconds = Number(process.env.SKILL_RAILS_WAIT_SLICE_SECONDS ?? 20);
+  return (Number.isFinite(seconds) && seconds > 0 ? seconds : 20) * 1000;
+};
 const sleep = (ms: number) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 
 export class InputError extends Error {
@@ -173,12 +176,13 @@ function failureMessage(id: string, exitCode: number, stderr: string): string {
 /** Runs a run step once, or polls it until its condition. Returns true when the step is over. */
 function runStep(state: State, step: RunStep, id: string, exec: Exec): void {
   const frame = top(state);
+  let commandTimeoutMs = (step['timeout-minutes'] ?? RUN_TIMEOUT_MINUTES) * 60_000;
   const once = () => {
     const result = exec(step.run, {
       env: render(step.env ?? {}, contextOf(state)) as Record<string, unknown>,
       dir: frame.dir,
       cwd: state.cwd,
-      timeoutMs: (step.until === undefined ? (step['timeout-minutes'] ?? RUN_TIMEOUT_MINUTES) : RUN_TIMEOUT_MINUTES) * 60_000,
+      timeoutMs: commandTimeoutMs,
     });
     frame.results[id] = { outcome: result.outcome, exitCode: result.exitCode, outputs: result.outputs };
     state.notes.push(...result.warnings);
@@ -186,6 +190,9 @@ function runStep(state: State, step: RunStep, id: string, exec: Exec): void {
   };
   const fail = (message: string): void => {
     frame.pollStarted = undefined;
+    frame.pollNextAt = undefined;
+    const result = frame.results[id];
+    if (result) result.outcome = 'failure';
     if (step['continue-on-error']) frame.index += 1;
     else endFlow(state, 'failed', message);
   };
@@ -200,26 +207,34 @@ function runStep(state: State, step: RunStep, id: string, exec: Exec): void {
   const deadline = frame.pollStarted + (step['timeout-minutes'] ?? POLL_TIMEOUT_MINUTES) * 60_000;
   const sliceEnd = Date.now() + waitSliceMs();
   const interval = (step['interval-seconds'] ?? POLL_INTERVAL_SECONDS) * 1000;
+  const wait = (retryAt: number) => {
+    state.pending = {
+      id, type: 'wait', retryAt,
+      instructions: `Step "${id}" is still waiting. Wait until ${new Date(retryAt).toISOString()}, then report it as done with no output to keep waiting.`,
+    };
+  };
   for (;;) {
+    const now = Date.now();
+    if (now >= deadline) return fail(`Step "${id}" timed out after ${step['timeout-minutes'] ?? POLL_TIMEOUT_MINUTES} minutes.`);
+    if (frame.pollNextAt && now < frame.pollNextAt) {
+      if (frame.pollNextAt >= sliceEnd) return wait(frame.pollNextAt);
+      sleep(frame.pollNextAt - now);
+    }
+    // A single poll command also fits the remaining slice and overall deadline.
+    commandTimeoutMs = Math.max(1, Math.min(RUN_TIMEOUT_MINUTES * 60_000, deadline - Date.now(), sliceEnd - Date.now()));
     const result = once();
     if (result.outcome === 'failure') return fail(failureMessage(id, result.exitCode, result.stderr));
     if (condition(step.until, contextOf(state))) {
       frame.pollStarted = undefined;
+      frame.pollNextAt = undefined;
       frame.index += 1;
       return;
     }
     if (Date.now() + interval > deadline) {
-      (frame.results[id] as { outcome: string }).outcome = 'failure';
       return fail(`Step "${id}" timed out after ${step['timeout-minutes'] ?? POLL_TIMEOUT_MINUTES} minutes.`);
     }
-    if (Date.now() + interval > sliceEnd) {
-      state.pending = {
-        id,
-        type: 'wait',
-        instructions: `Step "${id}" is still waiting (polls every ${interval / 1000} s). Report it as done, with no output, to keep waiting.`,
-      };
-      return;
-    }
+    frame.pollNextAt = Date.now() + interval;
+    if (frame.pollNextAt >= sliceEnd) return wait(frame.pollNextAt);
     sleep(interval);
   }
 }

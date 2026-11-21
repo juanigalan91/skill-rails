@@ -7,7 +7,9 @@ argument-hint: "<what the skill does>"
 # Create a skill with skill-rails
 
 Writes a new skill folder: `SKILL.md`, `flow.yaml`, `scripts/` and `prompts/`.
-Read `${CLAUDE_SKILL_DIR}/../../docs/format.md` first: it is the reference of the flow format.
+Read [the flow format](../../docs/format.md) first: it is the reference of the flow format.
+
+Resolve relative links from this SKILL.md file, not from the project working directory. Keep the package’s `skills/` and `docs/` layout together.
 
 ## Step 1: Understand the skill
 
@@ -17,7 +19,7 @@ Ask the user only for the ones that it does not give:
 - what the skill does, its inputs, and its result;
 - whether it runs with a user (it can ask questions) or unattended (it never asks);
 - the tools and other skills that it uses;
-- where to write it (for example `.claude/skills/<name>/` or a plugin `skills/` folder).
+- where to write it (the host agent’s skill directory or a plugin `skills/` folder).
 
 ## Step 2: Design the steps
 
@@ -49,7 +51,7 @@ Show the design to the user as a table of steps (id, type, what it does) before 
   Print `::warning::<text>` for a message to the user.
   Make each script executable.
 - `prompts/<id>.md`: the instructions, with `${{ }}` for the values of earlier steps.
-- `SKILL.md`: copy `${CLAUDE_SKILL_DIR}/template/SKILL.md` and fill the name, the description and the inputs.
+- `SKILL.md`: copy [the template](template/SKILL.md) and fill the name, the description and the inputs.
 
 Rules:
 

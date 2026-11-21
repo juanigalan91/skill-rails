@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { check, done, start, status } from '../src/api.js';
 import type { Report } from '../src/types.js';
 import { tempDir } from './helpers.js';
@@ -144,21 +144,64 @@ steps:
     expect(run({ 'flow.yaml': poll('1') })).toMatchObject({ status: 'done', message: 'ready after ready' });
   });
 
-  it('fails on the time limit', () => {
-    expect(run({ 'flow.yaml': poll('0.001') })).toMatchObject({ status: 'failed', message: 'Step "wait" timed out after 0.001 minutes.' });
+  it('fails when the next poll would exceed the time limit', () => {
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(1000);
+    const dir = tempDir({ 'flow.yaml': poll('0.001') });
+    const exec = vi.fn(() => {
+      // A 20 ms check leaves less than the 50 ms interval in the 60 ms budget.
+      clock.mockReturnValue(1020);
+      return { outcome: 'success' as const, exitCode: 0, outputs: { state: 'pending' }, warnings: [], stderr: '' };
+    });
+    try {
+      expect(start({ file: path.join(dir, 'flow.yaml'), cwd: dir, exec })).toMatchObject({ status: 'failed', message: 'Step "wait" timed out after 0.001 minutes.' });
+      expect(exec.mock.calls).toHaveLength(1);
+      expect(status({ flow: 'poll', cwd: dir })).toMatchObject({ results: { wait: { outcome: 'failure' } } });
+    } finally {
+      clock.mockRestore();
+    }
   });
 
-  it('gives control back to the agent after a time slice, then goes on', () => {
-    process.env.SKILL_RAILS_WAIT_SLICE_SECONDS = '0.01';
+  it('persists the next poll time, refuses early polling, and resumes when due', () => {
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(1000);
+    const exec = vi.fn(() => ({ outcome: 'success' as const, exitCode: 0, outputs: { state: 'pending' }, warnings: [], stderr: '' }));
+    const dir = tempDir({ 'flow.yaml': poll('1').replace('interval-seconds: 0.05', 'interval-seconds: 30') });
     try {
-      const first = run({ 'flow.yaml': poll('1') }) as StepReport;
-      expect(first).toMatchObject({ status: 'step', type: 'wait', id: 'wait' });
-      let report: Report = first;
-      for (let i = 0; i < 5 && report.status === 'step'; i++) report = answer('poll', 'wait');
-      expect(report).toMatchObject({ status: 'done', message: 'ready after ready' });
+      expect(start({ file: path.join(dir, 'flow.yaml'), cwd: dir, exec })).toMatchObject({ status: 'step', type: 'wait', retryAt: 31000, cwd: dir });
+      expect(exec.mock.calls).toHaveLength(1);
+      expect(done({ flow: 'poll', id: 'wait', cwd: dir, exec })).toMatchObject({ status: 'step', retryAt: 31000 });
+      expect(exec.mock.calls).toHaveLength(1);
+      clock.mockReturnValue(31000);
+      exec.mockReturnValue({ outcome: 'success', exitCode: 0, outputs: { state: 'ready' }, warnings: [], stderr: '' });
+      expect(done({ flow: 'poll', id: 'wait', cwd: dir, exec })).toMatchObject({ status: 'done', message: 'ready after ready' });
+      expect(exec.mock.calls).toHaveLength(2);
     } finally {
-      delete process.env.SKILL_RAILS_WAIT_SLICE_SECONDS;
+      clock.mockRestore();
     }
+  });
+
+  it('fails an expired persisted poll without running another command', () => {
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(1000);
+    const exec = vi.fn(() => ({ outcome: 'success' as const, exitCode: 0, outputs: { state: 'pending' }, warnings: [], stderr: '' }));
+    const dir = tempDir({ 'flow.yaml': poll('1').replace('interval-seconds: 0.05', 'interval-seconds: 30') });
+    try {
+      expect(start({ file: path.join(dir, 'flow.yaml'), cwd: dir, exec })).toMatchObject({ status: 'step', type: 'wait' });
+      clock.mockReturnValue(61001);
+      expect(done({ flow: 'poll', id: 'wait', cwd: dir, exec })).toMatchObject({ status: 'failed', message: 'Step "wait" timed out after 1 minutes.' });
+      expect(exec.mock.calls).toHaveLength(1);
+      expect(status({ flow: 'poll', cwd: dir })).toMatchObject({ results: { wait: { outcome: 'failure' } } });
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
+  it('bounds poll commands by the call slice', () => {
+    const dir = tempDir({ 'flow.yaml': poll('1') });
+    const exec = vi.fn((_command: string, options: import('../src/types.js').RunOptions) => {
+      expect(options.timeoutMs).toBeGreaterThan(0);
+      expect(options.timeoutMs).toBeLessThanOrEqual(20000);
+      return { outcome: 'success' as const, exitCode: 0, outputs: { state: 'ready' }, warnings: [], stderr: '' };
+    });
+    expect(start({ file: path.join(dir, 'flow.yaml'), cwd: dir, exec })).toMatchObject({ status: 'done' });
   });
 });
 

@@ -85,8 +85,8 @@ A `run` step with `until` runs its command again until the condition is true: fo
 
 - In `until`, `steps.<id>` holds the result of the last run.
 - A run that fails (exit code not 0) ends the polling as a failure: report "not ready yet" in an output, not with the exit code.
-- The runner gives control back to the agent after 9 minutes (`SKILL_RAILS_WAIT_SLICE_SECONDS`), so that one command stays under the tool timeout of the agent.
-  The agent then gets a `wait` step: it reports it as done, with no output, and the polling goes on.
+- The runner uses a 20-second polling slice (`SKILL_RAILS_WAIT_SLICE_SECONDS`). Each poll command is limited to the remaining slice and overall polling deadline; an overlong command fails. Keep status checks short.
+  The agent gets a `wait` step with `retryAt` (Unix milliseconds). It waits until that time, then reports the step as done with no output. Early calls preserve the scheduled check. Ordinary non-polling commands retain their own timeout; this is not a global call deadline.
 
 ### `prompt`
 
@@ -110,7 +110,7 @@ The agent follows the instructions, then reports an output.
 
 ### `skill`
 
-The agent invokes another skill with `with` as its arguments, then follows the optional `prompt` or `prompt-file`.
+The agent loads and follows another installed skill through its host’s supported mechanism, with `with` as its arguments, then follows the optional `prompt` or `prompt-file`. If the skill is unavailable, the agent reports failure.
 
 ```yaml
 - id: review
@@ -124,7 +124,7 @@ When the other skill only runs a script, call the script in a `run` step: it cos
 
 ### `ask`
 
-The agent asks the user one or more multiple-choice questions.
+The agent asks the user one or more questions using a native question tool or chat if the tool cannot represent them. It waits for the reply before reporting an answer.
 
 ```yaml
 - id: confirm
@@ -251,6 +251,8 @@ Each command prints one JSON object.
 | `error` | The flow file or a command is not valid: `errors`. | Tells the user the errors. |
 
 A result can also have `notes`: the warnings of the run steps, which the agent shows to the user.
+
+CLI commands accept `--cwd <project-directory>`, including `mcp` to bind the server to a project. Paths are relative to this directory. Reports from `start`, `done`, and `status` include `cwd`.
 
 The state is a JSON file per flow name and working directory, in `$SKILL_RAILS_STATE_DIR` (default: the system temp folder).
 `start` resets it.

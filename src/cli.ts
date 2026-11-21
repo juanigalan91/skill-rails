@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import path from 'node:path';
 import { check, done, reset, start, status } from './api.js';
 import type { Report } from './types.js';
 
@@ -10,7 +11,8 @@ const USAGE = `Usage:
   skill-rails reset <flow>                                    delete the state of a flow
   skill-rails check <flow.yaml>                               check a flow file without running it
   skill-rails test [<file or folder> ...] [--json]            run the *.test.yaml flow tests (default: the current folder)
-  skill-rails mcp                                             run the MCP server on stdio`;
+  skill-rails mcp                                             run the MCP server on stdio
+  All commands accept --cwd <project-directory>.`;
 
 function option(args: string[], name: string): string | undefined {
   const i = args.indexOf(`--${name}`);
@@ -39,14 +41,30 @@ function outputOf(args: string[]): unknown {
 }
 
 export async function main(argv: string[], print = (value: Report) => process.stdout.write(`${JSON.stringify(value)}\n`)): Promise<number> {
-  const [command, ...args] = argv;
+  const [command, ...rawArgs] = argv;
+  const args = [...rawArgs];
+  let explicitCwd: string | undefined;
+  const cwdIndex = args.indexOf('--cwd');
+  if (cwdIndex !== -1) {
+    explicitCwd = args[cwdIndex + 1];
+    if (!explicitCwd || explicitCwd.startsWith('--')) {
+      print({ status: 'error', errors: ['--cwd needs a project directory'] });
+      return 2;
+    }
+    args.splice(cwdIndex, 2);
+  }
   const [first, second] = args;
+  // npx and npm exec run the command from the nearest folder with a package.json; INIT_CWD is where the user ran it.
+  // Other npm and yarn commands also set INIT_CWD, for their own folder: use it only under npx or npm exec.
+  const launchCwd = process.env.npm_command === 'exec' && process.env.INIT_CWD ? process.env.INIT_CWD : process.cwd();
+  const cwd = path.resolve(launchCwd, explicitCwd ?? '.');
+  const file = (target: string) => path.resolve(cwd, target);
   let result: Report;
   try {
     switch (command) {
       case 'start':
         if (!first || first.startsWith('--')) throw new Error(USAGE);
-        result = start({ file: first, inputs: inputsOf(args) });
+        result = start({ file: file(first), inputs: inputsOf(args), cwd });
         break;
       case 'done': {
         if (!first || !second) throw new Error(USAGE);
@@ -57,25 +75,25 @@ export async function main(argv: string[], print = (value: Report) => process.st
           result = { status: 'invalid', id: second, errors: [`--output is not valid JSON: ${(error as Error).message}`] };
           break;
         }
-        result = done({ flow: first, id: second, output, fail: option(args, 'fail') });
+        result = done({ flow: first, id: second, output, fail: option(args, 'fail'), cwd });
         break;
       }
       case 'status':
         if (!first) throw new Error(USAGE);
-        result = status({ flow: first });
+        result = status({ flow: first, cwd });
         break;
       case 'reset':
         if (!first) throw new Error(USAGE);
-        result = reset({ flow: first });
+        result = reset({ flow: first, cwd });
         break;
       case 'check':
         if (!first) throw new Error(USAGE);
-        result = check({ file: first });
+        result = check({ file: file(first) });
         break;
       case 'test': {
         const { runTests } = await import('./testing.js');
         const targets = args.filter((arg) => !arg.startsWith('--'));
-        const results = runTests(targets.length ? targets : ['.']);
+        const results = runTests((targets.length ? targets : ['.']).map(file));
         if (args.includes('--json')) process.stdout.write(`${JSON.stringify(results)}\n`);
         else {
           for (const r of results) {
@@ -89,7 +107,7 @@ export async function main(argv: string[], print = (value: Report) => process.st
       }
       case 'mcp': {
         const { serve } = await import('./mcp.js');
-        await serve();
+        await serve(cwd);
         return 0;
       }
       default:

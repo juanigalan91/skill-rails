@@ -7,8 +7,10 @@ argument-hint: "<path of the skill folder or SKILL.md>"
 # Migrate a skill to skill-rails
 
 Turns a Markdown skill into a flow skill, next to the original: `<name>-flow/` with `SKILL.md`, `flow.yaml`, `scripts/` and `prompts/`.
-Keep the original skill until the comparison in Step 6 shows that the flow gives the same result.
-Read `${CLAUDE_SKILL_DIR}/../../docs/format.md` first: it is the reference of the flow format.
+Keep the original skill until deterministic tests and the rule audit show that the flow preserves its behavior; use the optional live comparison in Step 6 for additional evidence.
+Read [the flow format](../../docs/format.md) first: it is the reference of the flow format.
+
+Resolve relative links from this SKILL.md file, not from the project working directory. Keep the package’s `skills/` and `docs/` layout together.
 
 ## Step 1: Read the skill
 
@@ -68,11 +70,8 @@ Do not run a step that publishes something (push, PR, message) during a test.
 ## Step 6: Compare
 
 Compare the two versions on the same input, when the user agrees to the cost.
-A headless run gives the numbers:
-
-```bash
-claude -p "/<plugin>:<skill> <args>" --output-format json --no-session-persistence --settings '{"disableAllHooks": true}' --strict-mcp-config
-```
+Use the current agent's documented headless mode if available; otherwise compare in separate interactive sessions. Do not assume another agent CLI is installed. Report only metrics the host exposes.
+First add deterministic `*.test.yaml` cases and run `skill-rails test`; these need no model. Live comparisons are optional and require the user's agreement to the cost.
 
 Run each version at least 3 times, in a copy of the repository, and compare the result (the files or the PR), the duration, the turns, the tokens and the cost.
 Give the user the table, the rule list from Step 3, and the differences in the result.
