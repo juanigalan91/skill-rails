@@ -1,4 +1,4 @@
-flow: ../flow.yaml
+flow: ../rails.yaml
 git: false
 path:
   - stubs
@@ -19,12 +19,12 @@ tests:
             purpose: Finish safely.
       author:
         $files:
-          generated/flow.yaml: |
+          generated/rails.yaml: |
             name: generated
             steps:
               - stop: generated safely
           generated/tests/generated.test.yaml: |
-            flow: ../flow.yaml
+            flow: ../rails.yaml
             git: false
             expect:
               status: done
@@ -33,7 +33,7 @@ tests:
         report: Created and safely exercised generated.
         files:
           - SKILL.md
-          - flow.yaml
+          - rails.yaml
         codeSteps: 1
         agentSteps: 0
     expect:
@@ -46,7 +46,7 @@ tests:
         recheck: skipped
       files:
         generated/SKILL.md: '/name: generated/'
-        generated/flow.yaml: |
+        generated/rails.yaml: |
           name: generated
           steps:
             - stop: generated safely
@@ -62,17 +62,17 @@ tests:
             purpose: Finish safely.
       author:
         $files:
-          generated/flow.yaml: |
+          generated/rails.yaml: |
             name: generated
             steps: []
       fix:
         $files:
-          generated/flow.yaml: |
+          generated/rails.yaml: |
             name: generated
             steps:
               - stop: generated safely
           generated/tests/generated.test.yaml: |
-            flow: ../flow.yaml
+            flow: ../rails.yaml
             git: false
             expect:
               status: done
@@ -81,7 +81,7 @@ tests:
         report: Created and safely exercised generated.
         files:
           - SKILL.md
-          - flow.yaml
+          - rails.yaml
         codeSteps: 1
         agentSteps: 0
     expect:
@@ -103,7 +103,7 @@ tests:
             purpose: Finish safely.
       author:
         $files:
-          generated/flow.yaml: |
+          generated/rails.yaml: |
             name: generated
             steps: []
       fix: {}
@@ -126,7 +126,7 @@ tests:
             purpose: Finish safely.
       author:
         $files:
-          generated/flow.yaml: |
+          generated/rails.yaml: |
             name: generated
             steps:
               - stop: generated safely
@@ -188,12 +188,12 @@ tests:
             purpose: Finish safely.
       author:
         $files:
-          literal;$(touch injected) 'quoted'/flow.yaml: |
+          literal;$(touch injected) 'quoted'/rails.yaml: |
             name: generated
             steps:
               - stop: generated safely
           literal;$(touch injected) 'quoted'/tests/generated.test.yaml: |
-            flow: ../flow.yaml
+            flow: ../rails.yaml
             git: false
             expect:
               status: done
@@ -202,7 +202,7 @@ tests:
         report: Created and safely exercised generated.
         files:
           - SKILL.md
-          - flow.yaml
+          - rails.yaml
         codeSteps: 1
         agentSteps: 0
     expect:
@@ -226,12 +226,12 @@ tests:
             purpose: Finish safely.
       author:
         $files:
-          generated/flow.yaml: |
+          generated/rails.yaml: |
             name: generated
             steps:
               - stop: generated safely
           generated/tests/generated.test.yaml: |
-            flow: ../flow.yaml
+            flow: ../rails.yaml
             git: false
             expect:
               status: done
@@ -240,7 +240,7 @@ tests:
         report: Created and safely exercised generated.
         files:
           - SKILL.md
-          - flow.yaml
+          - rails.yaml
         codeSteps: 1
         agentSteps: 0
     expect:
@@ -259,12 +259,12 @@ tests:
             purpose: Finish safely.
       author:
         $files:
-          generated/flow.yaml: |
+          generated/rails.yaml: |
             name: generated
             steps:
               - stop: generated safely
           generated/tests/generated.test.yaml: |
-            flow: ../flow.yaml
+            flow: ../rails.yaml
             git: false
             expect:
               status: done

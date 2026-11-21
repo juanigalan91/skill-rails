@@ -1,7 +1,7 @@
 ---
 name: run-skill-rails
-description: "Run a skill-rails flow file (flow.yaml) step by step: the runner gives one step at a time, you do it and report its output. Use when a skill tells you to run a flow, or when asked to run a skill-rails flow."
-argument-hint: "<flow.yaml> [key=value ...]"
+description: "Run a skill-rails flow file (rails.yaml) step by step: the runner gives one step at a time, you do it and report its output. Use when a skill tells you to run a flow, or when asked to run a skill-rails flow."
+argument-hint: "<rails.yaml> [key=value ...]"
 ---
 
 # Run a skill-rails flow
@@ -19,7 +19,7 @@ Otherwise use the CLI: `npx -y skill-rails@0.2 <command>`.
 ## Step 1: Start
 
 ```bash
-npx -y skill-rails@0.2 start <flow.yaml> [--input <key>=<value> ...]
+npx -y skill-rails@0.2 start <rails.yaml> [--input <key>=<value> ...]
 ```
 
 Give only the inputs that the caller or the invocation text gives.

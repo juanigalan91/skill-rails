@@ -22,7 +22,7 @@ Native Codex plugin packaging is included from `skill-rails@0.2.2`. To try local
 ```bash
 yarn install --immutable
 yarn build
-node /absolute/path/to/skill-rails/bin/skill-rails.js check /absolute/path/to/flow.yaml
+node /absolute/path/to/skill-rails/bin/skill-rails.js check /absolute/path/to/rails.yaml
 ```
 
 In the configuration examples below, replace both absolute paths. `command: node` must resolve on the client's PATH; use an absolute Node executable if necessary. Merge these entries into existing configuration rather than replacing it.
@@ -152,7 +152,7 @@ Repeat for `create-skill-rails` and `migrate-to-skill-rails`, linking to their c
 For CLI-only use, load the same instructions and use:
 
 ```bash
-node /absolute/path/to/skill-rails/bin/skill-rails.js start /absolute/path/to/flow.yaml --cwd /absolute/path/to/project
+node /absolute/path/to/skill-rails/bin/skill-rails.js start /absolute/path/to/rails.yaml --cwd /absolute/path/to/project
 node /absolute/path/to/skill-rails/bin/skill-rails.js done <flow-name> <step-id> --cwd /absolute/path/to/project --output - <<'JSON'
 {}
 JSON
@@ -170,7 +170,7 @@ Pass the same project directory to subsequent `done`, `status`, and `reset` call
 
 ## Repeatable client smoke test
 
-Use a disposable project and this checkout's `examples/hello/flow.yaml`:
+Use a disposable project and this checkout's `examples/hello/rails.yaml`:
 
 1. Confirm all three skills are discoverable and the create skill can read its format reference and template.
 2. Ask the runner skill to start `hello`, using the intended project. Check `cwd` in the report.

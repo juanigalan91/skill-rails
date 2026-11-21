@@ -11,12 +11,12 @@ skill-rails test --json               # the results as JSON, for CI
 
 ## A test file
 
-Put the tests of a flow in `tests/<name>.test.yaml`, next to `flow.yaml`.
+Put the tests of a flow in `tests/<name>.test.yaml`, next to `rails.yaml`.
 A file has one test, or a `tests:` list whose items share the keys at the top.
 In a test, `env` and `path` add to the shared ones, and the other keys replace them.
 
 ```yaml
-flow: ../flow.yaml          # the flow to test, relative to this file
+flow: ../rails.yaml          # the flow to test, relative to this file
 fixture: fixtures/repo      # copied into a new temp working directory
 git: true                   # git init and commit the fixture (default: true)
 setup: |                    # bash, run in the working directory before the flow

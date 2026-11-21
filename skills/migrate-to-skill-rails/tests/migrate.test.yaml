@@ -1,270 +1,363 @@
-flow: ../flow.yaml
+flow: ../rails.yaml
 git: false
 path:
   - ../../create-skill-rails/tests/stubs
 setup: |-
-  mkdir original
-  cat > original/SKILL.md <<'ORIGINAL'
+  mkdir -p skill/scripts
+  cat > skill/SKILL.md <<'SKILL'
   ---
-  name: original
-  description: Original fixture.
+  name: sample
+  description: A sample skill.
   ---
-  Report generated safely.
-  ORIGINAL
+  Report migrated safely.
+  SKILL
+  printf 'keep supporting docs\n' > skill/README.md
+  printf 'keep existing script\n' > skill/scripts/helper.sh
 inputs:
-  source: '{{cwd}}/original'
+  source: '{{cwd}}/skill'
   auto: true
 tests:
-  - name: migrates through the creation subflow and retains the original
+  - name: migrates the existing skill without sibling copies or backups
     answers:
       audit:
-        brief: Migrate the safe stop.
+        brief: Migrate the existing sample skill in place.
         rules:
-          - rule: Report generated safely.
-            destination: flow.yaml finish stop
+          - rule: Report migrated safely.
+            destination: rails.yaml finish stop
       plan:
-        name: generated
-        description: A sample generated skill.
-        target: '{{cwd}}/original-flow'
+        name: sample
+        description: A migrated skill.
+        target: '{{cwd}}/skill'
         steps:
           - id: finish
             type: stop
-            purpose: Finish safely.
+            purpose: Report migrated safely.
       author:
         $files:
-          original-flow/flow.yaml: |
-            name: generated
+          skill/SKILL.md: |
+            ---
+            name: sample
+            description: A migrated skill.
+            ---
+            Run rails.yaml with run-skill-rails.
+          skill/rails.yaml: |
+            name: sample
             steps:
-              - stop: generated safely
-          original-flow/tests/generated.test.yaml: |
-            flow: ../flow.yaml
+              - stop: migrated safely
+          skill/tests/sample.test.yaml: |
+            flow: ../rails.yaml
             git: false
             expect:
               status: done
-              message: generated safely
-          original-flow/RULES.md: |
-            Report generated safely -> flow.yaml finish stop
+              message: migrated safely
       smoke:
-        report: Created and safely exercised generated.
+        report: Migrated and safely exercised sample.
         files:
           - SKILL.md
-          - flow.yaml
+          - rails.yaml
         codeSteps: 1
         agentSteps: 0
     expect:
       status: done
-      message: /Original retained/
+      message: /Migrated in place/
       steps:
         create: success
-        consent: skipped
-        compare: skipped
       files:
-        original/SKILL.md: |
+        skill/SKILL.md: |
           ---
-          name: original
-          description: Original fixture.
+          name: sample
+          description: A migrated skill.
           ---
-          Report generated safely.
-        original-flow/RULES.md: exists
+          Run rails.yaml with run-skill-rails.
+        skill/rails.yaml: |
+          name: sample
+          steps:
+            - stop: migrated safely
+        skill-flow: absent
+        skill/SKILL.md.bak: absent
+        skill/SKILL.original.md: absent
+        skill/backup: absent
+        skill/RULES.md: absent
+        skill/README.md: |
+          keep supporting docs
+        skill/scripts/helper.sh: |
+          keep existing script
   - name: accepts a SKILL.md source path
     inputs:
-      source: '{{cwd}}/original/SKILL.md'
+      source: '{{cwd}}/skill/SKILL.md'
       auto: true
     answers:
       audit:
-        brief: Migrate the safe stop.
+        brief: Migrate the existing sample skill in place.
         rules:
-          - rule: Report generated safely.
-            destination: flow.yaml finish stop
+          - rule: Report migrated safely.
+            destination: rails.yaml finish stop
       plan:
-        name: generated
-        description: A sample generated skill.
-        target: '{{cwd}}/original-flow'
+        name: sample
+        description: A migrated skill.
+        target: '{{cwd}}/skill'
         steps:
           - id: finish
             type: stop
-            purpose: Finish safely.
+            purpose: Report migrated safely.
       author:
         $files:
-          original-flow/flow.yaml: |
-            name: generated
+          skill/SKILL.md: |
+            ---
+            name: sample
+            description: A migrated skill.
+            ---
+            Run rails.yaml with run-skill-rails.
+          skill/rails.yaml: |
+            name: sample
             steps:
-              - stop: generated safely
-          original-flow/tests/generated.test.yaml: |
-            flow: ../flow.yaml
+              - stop: migrated safely
+          skill/tests/sample.test.yaml: |
+            flow: ../rails.yaml
             git: false
             expect:
               status: done
-              message: generated safely
-          original-flow/RULES.md: |
-            Report generated safely -> flow.yaml finish stop
+              message: migrated safely
       smoke:
-        report: Created and safely exercised generated.
+        report: Migrated and safely exercised sample.
         files:
           - SKILL.md
-          - flow.yaml
+          - rails.yaml
         codeSteps: 1
         agentSteps: 0
     expect:
       status: done
       files:
-        original/SKILL.md: |
+        skill/SKILL.md: |
           ---
-          name: original
-          description: Original fixture.
+          name: sample
+          description: A migrated skill.
           ---
-          Report generated safely.
-  - name: never offers a paid comparison in unattended mode
+          Run rails.yaml with run-skill-rails.
+        skill-flow: absent
+        skill/SKILL.md.bak: absent
+        skill/SKILL.original.md: absent
+        skill/backup: absent
+        skill/RULES.md: absent
+  - name: supports interactive in-place migration
     inputs:
-      source: '{{cwd}}/original'
-      auto: true
-      compare: true
+      source: '{{cwd}}/skill'
+      auto: false
     answers:
       audit:
-        brief: Migrate the safe stop.
+        brief: Migrate the existing sample skill in place.
         rules:
-          - rule: Report generated safely.
-            destination: flow.yaml finish stop
+          - rule: Report migrated safely.
+            destination: rails.yaml finish stop
       plan:
-        name: generated
-        description: A sample generated skill.
-        target: '{{cwd}}/original-flow'
+        name: sample
+        description: A migrated skill.
+        target: '{{cwd}}/skill'
         steps:
           - id: finish
             type: stop
-            purpose: Finish safely.
+            purpose: Report migrated safely.
       author:
         $files:
-          original-flow/flow.yaml: |
-            name: generated
+          skill/SKILL.md: |
+            ---
+            name: sample
+            description: A migrated skill.
+            ---
+            Run rails.yaml with run-skill-rails.
+          skill/rails.yaml: |
+            name: sample
             steps:
-              - stop: generated safely
-          original-flow/tests/generated.test.yaml: |
-            flow: ../flow.yaml
+              - stop: migrated safely
+          skill/tests/sample.test.yaml: |
+            flow: ../rails.yaml
             git: false
             expect:
               status: done
-              message: generated safely
-          original-flow/RULES.md: |
-            Report generated safely -> flow.yaml finish stop
+              message: migrated safely
       smoke:
-        report: Created and safely exercised generated.
+        report: Migrated and safely exercised sample.
         files:
           - SKILL.md
-          - flow.yaml
+          - rails.yaml
         codeSteps: 1
         agentSteps: 0
     expect:
       status: done
-      steps:
-        consent: skipped
-        compare: skipped
-  - name: skips a live comparison when the user declines
-    inputs:
-      source: '{{cwd}}/original'
-      compare: true
+      files:
+        skill/SKILL.md: |
+          ---
+          name: sample
+          description: A migrated skill.
+          ---
+          Run rails.yaml with run-skill-rails.
+        skill-flow: absent
+        skill/SKILL.md.bak: absent
+        skill/SKILL.original.md: absent
+        skill/backup: absent
+        skill/RULES.md: absent
+  - name: does not replace the wrapper before the audit completes
     answers:
       audit:
-        brief: Migrate the safe stop.
-        rules:
-          - rule: Report generated safely.
-            destination: flow.yaml finish stop
-      plan:
-        name: generated
-        description: A sample generated skill.
-        target: '{{cwd}}/original-flow'
-        steps:
-          - id: finish
-            type: stop
-            purpose: Finish safely.
-      author:
-        $files:
-          original-flow/flow.yaml: |
-            name: generated
-            steps:
-              - stop: generated safely
-          original-flow/tests/generated.test.yaml: |
-            flow: ../flow.yaml
-            git: false
-            expect:
-              status: done
-              message: generated safely
-          original-flow/RULES.md: |
-            Report generated safely -> flow.yaml finish stop
-      smoke:
-        report: Created and safely exercised generated.
-        files:
-          - SKILL.md
-          - flow.yaml
-        codeSteps: 1
-        agentSteps: 0
-      consent:
-        answer: Skip
-    expect:
-      status: done
-      steps:
-        consent: success
-        compare: skipped
-  - name: runs comparison only after explicit consent
-    inputs:
-      source: '{{cwd}}/original'
-      compare: true
-    answers:
-      audit:
-        brief: Migrate the safe stop.
-        rules:
-          - rule: Report generated safely.
-            destination: flow.yaml finish stop
-      plan:
-        name: generated
-        description: A sample generated skill.
-        target: '{{cwd}}/original-flow'
-        steps:
-          - id: finish
-            type: stop
-            purpose: Finish safely.
-      author:
-        $files:
-          original-flow/flow.yaml: |
-            name: generated
-            steps:
-              - stop: generated safely
-          original-flow/tests/generated.test.yaml: |
-            flow: ../flow.yaml
-            git: false
-            expect:
-              status: done
-              message: generated safely
-          original-flow/RULES.md: |
-            Report generated safely -> flow.yaml finish stop
-      smoke:
-        report: Created and safely exercised generated.
-        files:
-          - SKILL.md
-          - flow.yaml
-        codeSteps: 1
-        agentSteps: 0
-      consent:
-        answer: Compare
-      compare:
-        report: Compared three safe runs per version; metrics unavailable.
-    expect:
-      status: done
-      steps:
-        compare: success
-      message: /Compared three safe runs/
-  - name: refuses to overwrite an existing migration
-    setup: |-
-      mkdir original original-flow
-      printf 'keep original' > original/SKILL.md
-      printf 'keep migration' > original-flow/SKILL.md
-    answers: {}
+        $fail: Cannot read a required reference.
     expect:
       status: failed
-      message: /Destination already exists/
+      message: Cannot read a required reference.
       files:
-        original/SKILL.md: keep original
-        original-flow/SKILL.md: keep migration
+        skill/SKILL.md: |
+          ---
+          name: sample
+          description: A sample skill.
+          ---
+          Report migrated safely.
+        skill-flow: absent
+        skill/SKILL.md.bak: absent
+        skill/SKILL.original.md: absent
+        skill/backup: absent
+        skill/RULES.md: absent
+      steps:
+        create: not reached
+  - name: keeps the current wrapper readable until authoring
+    answers:
+      audit:
+        brief: Migrate the existing sample skill in place.
+        rules:
+          - rule: Report migrated safely.
+            destination: rails.yaml finish stop
+      plan:
+        name: sample
+        description: A migrated skill.
+        target: '{{cwd}}/skill'
+        steps:
+          - id: finish
+            type: stop
+            purpose: Report migrated safely.
+      author:
+        $fail: Cannot author the migration.
+    expect:
+      status: failed
+      message: /Cannot author the migration/
+      files:
+        skill/SKILL.md: |
+          ---
+          name: sample
+          description: A sample skill.
+          ---
+          Report migrated safely.
+        skill-flow: absent
+        skill/SKILL.md.bak: absent
+        skill/SKILL.original.md: absent
+        skill/backup: absent
+        skill/RULES.md: absent
+        skill/README.md: |
+          keep supporting docs
+        skill/scripts/helper.sh: |
+          keep existing script
+  - name: repairs invalid YAML in the same directory
+    answers:
+      audit:
+        brief: Migrate the existing sample skill in place.
+        rules:
+          - rule: Report migrated safely.
+            destination: rails.yaml finish stop
+      plan:
+        name: sample
+        description: A migrated skill.
+        target: '{{cwd}}/skill'
+        steps:
+          - id: finish
+            type: stop
+            purpose: Report migrated safely.
+      author:
+        $files:
+          skill/rails.yaml: |
+            name: sample
+            steps: []
+      fix:
+        $files:
+          skill/SKILL.md: |
+            ---
+            name: sample
+            description: A migrated skill.
+            ---
+            Run rails.yaml with run-skill-rails.
+          skill/rails.yaml: |
+            name: sample
+            steps:
+              - stop: migrated safely
+          skill/tests/sample.test.yaml: |
+            flow: ../rails.yaml
+            git: false
+            expect:
+              status: done
+              message: migrated safely
+      smoke:
+        report: Migrated and safely exercised sample.
+        files:
+          - SKILL.md
+          - rails.yaml
+        codeSteps: 1
+        agentSteps: 0
+    expect:
+      status: done
+      files:
+        skill/SKILL.md: |
+          ---
+          name: sample
+          description: A migrated skill.
+          ---
+          Run rails.yaml with run-skill-rails.
+        skill-flow: absent
+        skill/SKILL.md.bak: absent
+        skill/SKILL.original.md: absent
+        skill/backup: absent
+        skill/RULES.md: absent
+  - name: stops on unresolved validation errors without restoring a backup
+    answers:
+      audit:
+        brief: Migrate the existing sample skill in place.
+        rules:
+          - rule: Report migrated safely.
+            destination: rails.yaml finish stop
+      plan:
+        name: sample
+        description: A migrated skill.
+        target: '{{cwd}}/skill'
+        steps:
+          - id: finish
+            type: stop
+            purpose: Report migrated safely.
+      author:
+        $files:
+          skill/SKILL.md: |
+            ---
+            name: sample
+            description: A migrated skill.
+            ---
+            Run rails.yaml with run-skill-rails.
+          skill/rails.yaml: |
+            name: sample
+            steps: []
+      fix: {}
+    expect:
+      status: failed
+      message: /Validation failed/
+      files:
+        skill/SKILL.md: |
+          ---
+          name: sample
+          description: A migrated skill.
+          ---
+          Run rails.yaml with run-skill-rails.
+        skill-flow: absent
+        skill/SKILL.md.bak: absent
+        skill/SKILL.original.md: absent
+        skill/backup: absent
+        skill/RULES.md: absent
+        skill/README.md: |
+          keep supporting docs
+        skill/scripts/helper.sh: |
+          keep existing script
   - name: fails on a missing source
     inputs:
       source: '{{cwd}}/missing'
@@ -273,70 +366,22 @@ tests:
       status: failed
       steps:
         audit: not reached
-  - name: propagates subflow failure before comparison
-    inputs:
-      source: '{{cwd}}/original'
-      compare: true
-    answers:
-      audit:
-        brief: Migrate the safe stop.
-        rules:
-          - rule: Report generated safely.
-            destination: flow.yaml finish stop
-      plan:
-        name: generated
-        description: A sample generated skill.
-        target: '{{cwd}}/original-flow'
-        steps:
-          - id: finish
-            type: stop
-            purpose: Finish safely.
-      author:
-        $fail: Cannot preserve a required rule.
+      files:
+        skill-flow: absent
+        skill/SKILL.md.bak: absent
+        skill/SKILL.original.md: absent
+        skill/backup: absent
+        skill/RULES.md: absent
+  - name: fails on a directory without SKILL.md
+    setup: mkdir skill
+    answers: {}
     expect:
       status: failed
-      message: /Cannot preserve a required rule/
       steps:
-        consent: not reached
+        audit: not reached
       files:
-        original/SKILL.md: |
-          ---
-          name: original
-          description: Original fixture.
-          ---
-          Report generated safely.
-  - name: requires the written rule audit before smoke testing
-    answers:
-      audit:
-        brief: Migrate the safe stop.
-        rules:
-          - rule: Report generated safely.
-            destination: flow.yaml finish stop
-      plan:
-        name: generated
-        description: A sample generated skill.
-        target: '{{cwd}}/original-flow'
-        steps:
-          - id: finish
-            type: stop
-            purpose: Finish safely.
-      author:
-        $files:
-          original-flow/flow.yaml: |
-            name: generated
-            steps:
-              - stop: generated safely
-          original-flow/tests/generated.test.yaml: |
-            flow: ../flow.yaml
-            git: false
-            expect:
-              status: done
-              message: generated safely
-      fix: {}
-    expect:
-      status: failed
-      message: /RULES.md is missing/
-      steps:
-        consent: not reached
-      files:
-        original/SKILL.md: /Report generated safely/
+        skill-flow: absent
+        skill/SKILL.md.bak: absent
+        skill/SKILL.original.md: absent
+        skill/backup: absent
+        skill/RULES.md: absent

@@ -2,7 +2,7 @@ name: create-skill-rails
 inputs:
   request: { type: string, required: true, description: "The user's skill request, verbatim." }
   target: { type: string, description: "Explicit destination directory, when supplied." }
-  source: { type: string, description: Original skill directory for a migration. }
+  source: { type: string, description: Existing skill directory to migrate in place. }
   auto: { type: boolean, default: false, description: Explicit unattended mode; never ask questions. }
 steps:
   - id: plan
@@ -29,6 +29,7 @@ steps:
     run: node "$FLOW_DIR/scripts/scaffold.mjs"
     env:
       TARGET: ${{ inputs.target || steps.plan.outputs.target }}
+      SOURCE: ${{ inputs.source }}
       NAME: ${{ steps.plan.outputs.name }}
       DESCRIPTION: ${{ steps.plan.outputs.description }}
   - id: author
@@ -37,7 +38,6 @@ steps:
     run: node "$FLOW_DIR/scripts/validate.mjs"
     env:
       TARGET: ${{ steps.scaffold.outputs.target }}
-      SOURCE: ${{ inputs.source }}
   - id: fix
     if: ${{ steps.check.outputs.valid != 'true' }}
     prompt-file: prompts/fix.md
@@ -46,7 +46,6 @@ steps:
     run: node "$FLOW_DIR/scripts/validate.mjs"
     env:
       TARGET: ${{ steps.scaffold.outputs.target }}
-      SOURCE: ${{ inputs.source }}
   - if: ${{ steps.check.outputs.valid != 'true' && steps.recheck.outputs.valid != 'true' }}
     stop: 'Validation failed for ${{ steps.scaffold.outputs.target }}. ${{ steps.recheck.outputs.errors }}'
     outcome: failure

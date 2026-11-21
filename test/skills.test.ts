@@ -23,7 +23,7 @@ it('generates a wrapper command that treats its destination as a literal path', 
       env: { ...process.env, TARGET: target, NAME: 'generated', DESCRIPTION: 'A test skill.', FLOW_OUTPUT: path.join(cwd, 'outputs') },
     });
     expect(scaffold.status, scaffold.stderr).toBe(0);
-    fs.writeFileSync(path.join(target, 'flow.yaml'), 'name: generated\nsteps:\n  - stop: safely started\n');
+    fs.writeFileSync(path.join(target, 'rails.yaml'), 'name: generated\nsteps:\n  - stop: safely started\n');
     const wrapper = fs.readFileSync(path.join(target, 'SKILL.md'), 'utf8');
     const command = wrapper.match(/```bash\n([^\n]+)/)?.[1]?.replace(' [--input <key>=<value> ...]', '');
     expect(command).toBeDefined();
@@ -34,6 +34,23 @@ it('generates a wrapper command that treats its destination as a literal path', 
     expect(run.status, run.stderr).toBe(0);
     expect(JSON.parse(run.stdout)).toMatchObject({ status: 'done', message: 'safely started' });
     expect(fs.existsSync(path.join(cwd, 'injected'))).toBe(false);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+it('rejects a migration target outside its source before changing any files', () => {
+  const cwd = tempDir({ 'source/SKILL.md': 'source rules', 'other/SKILL.md': 'other rules' });
+  try {
+    const result = spawnSync(process.execPath, [path.join(root, 'skills/create-skill-rails/scripts/scaffold.mjs')], {
+      cwd, encoding: 'utf8',
+      env: { ...process.env, SOURCE: path.join(cwd, 'source'), TARGET: path.join(cwd, 'other'), FLOW_OUTPUT: path.join(cwd, 'outputs') },
+    });
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('Migration target must be the source skill directory');
+    expect(fs.readFileSync(path.join(cwd, 'source/SKILL.md'), 'utf8')).toBe('source rules');
+    expect(fs.readFileSync(path.join(cwd, 'other/SKILL.md'), 'utf8')).toBe('other rules');
+    expect(fs.existsSync(path.join(cwd, 'other/scripts'))).toBe(false);
   } finally {
     fs.rmSync(cwd, { recursive: true, force: true });
   }

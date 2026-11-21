@@ -16,10 +16,9 @@ const invoke = (args) => {
   }
   return report;
 };
-const check = invoke(['check', path.join(target, 'flow.yaml')]);
+const check = invoke(['check', path.join(target, 'rails.yaml')]);
 if (check && check.status !== 'ok') errors.push(JSON.stringify(check));
 if (!fs.existsSync(path.join(target, 'SKILL.md'))) errors.push('SKILL.md is missing.');
-if (process.env.SOURCE && !fs.existsSync(path.join(target, 'RULES.md'))) errors.push('Migration rule audit RULES.md is missing.');
 if (check?.status === 'ok') {
   const tests = path.join(target, 'tests');
   if (!fs.existsSync(tests)) errors.push('Add deterministic tests under tests/.');

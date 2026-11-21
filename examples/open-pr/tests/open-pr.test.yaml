@@ -1,4 +1,4 @@
-flow: ../flow.yaml
+flow: ../rails.yaml
 path: [stubs]
 env:
   GIT_AUTHOR_NAME: test
