@@ -20,7 +20,11 @@
     "docs",
     "examples",
     ".claude-plugin",
-    ".mcp.json"
+    ".mcp.json",
+    "plugin.json",
+    "mcp.json",
+    ".codex-plugin",
+    ".agents/plugins/marketplace.json"
   ],
   "engines": {
     "node": ">=20"

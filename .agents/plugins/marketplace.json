@@ -1,0 +1,20 @@
+{
+  "name": "skill-rails",
+  "interface": {
+    "displayName": "skill-rails"
+  },
+  "plugins": [
+    {
+      "name": "skill-rails",
+      "source": {
+        "source": "local",
+        "path": "./"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_USE"
+      },
+      "category": "Productivity"
+    }
+  ]
+}
