@@ -1,0 +1,72 @@
+{
+  "name": "skillflow",
+  "version": "0.2.0",
+  "description": "Deterministic YAML flows for AI agent skills: the runner owns the order, the conditions and the shell steps, and hands the agent one step at a time.",
+  "type": "module",
+  "license": "MIT",
+  "bin": "bin/skillflow.js",
+  "exports": {
+    ".": {
+      "types": "./dist/api.d.ts",
+      "import": "./dist/api.js"
+    },
+    "./schema": "./schema/flow.schema.json"
+  },
+  "files": [
+    "bin",
+    "dist",
+    "schema",
+    "skills",
+    "docs",
+    "examples",
+    ".claude-plugin",
+    ".mcp.json"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.test.json",
+    "test": "yarn build && vitest run",
+    "prepack": "yarn build",
+    "prepublishOnly": "yarn typecheck && yarn test"
+  },
+  "keywords": [
+    "agent",
+    "skills",
+    "claude-code",
+    "workflow",
+    "mcp",
+    "llm",
+    "github-actions"
+  ],
+  "dependencies": {
+    "@actions/expressions": "^0.3.61",
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "ajv": "^8.17.1",
+    "js-yaml": "^4.1.0",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^22.20.5",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.4"
+  },
+  "author": {
+    "name": "Juani Galán",
+    "url": "https://github.com/juanigalan91"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/juanigalan91/skillflow.git"
+  },
+  "homepage": "https://github.com/juanigalan91/skillflow#readme",
+  "bugs": {
+    "url": "https://github.com/juanigalan91/skillflow/issues"
+  },
+  "main": "./dist/api.js",
+  "types": "./dist/api.d.ts",
+  "packageManager": "yarn@4.18.0"
+}

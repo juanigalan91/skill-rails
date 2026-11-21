@@ -1,0 +1,22 @@
+flow: ../flow.yaml
+git: false
+
+tests:
+  - name: a good day gets a poem
+    inputs: { who: team }
+    answers:
+      mood: { answer: Good }
+      poem: { poem: Sun on the desk. }
+    expect:
+      status: done
+      message: Sun on the desk.
+      outputs:
+        greet.greeting: Hello, team
+
+  - name: a bad day skips the poem
+    answers:
+      mood: { answer: Bad }
+    expect:
+      status: done
+      message: /better/
+      steps: { poem: skipped }

@@ -1,0 +1,16 @@
+{
+  "name": "skillflow",
+  "description": "Deterministic YAML flows for agent skills: run, create and migrate skills to skillflow",
+  "version": "0.2.0",
+  "license": "MIT",
+  "keywords": [
+    "skills",
+    "workflow",
+    "flow",
+    "deterministic"
+  ],
+  "author": {
+    "name": "Juani Galán",
+    "url": "https://github.com/juanigalan91"
+  }
+}

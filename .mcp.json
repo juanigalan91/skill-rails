@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "skillflow": {
+      "command": "npx",
+      "args": ["-y", "skillflow@0.2", "mcp"]
+    }
+  }
+}

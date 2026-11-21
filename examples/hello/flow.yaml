@@ -1,0 +1,32 @@
+# The smallest useful flow: a shell step, a question, a prompt with a checked output, and an end.
+name: hello
+inputs:
+  who:
+    type: string
+    default: world
+
+steps:
+  - id: greet
+    run: echo "greeting=Hello, $WHO" >> "$FLOW_OUTPUT"
+    env:
+      WHO: ${{ inputs.who }}
+
+  - id: mood
+    ask:
+      - id: answer
+        header: Mood
+        question: ${{ steps.greet.outputs.greeting }}! How is your day?
+        options:
+          - { label: Good, description: The day goes well. }
+          - { label: Bad, description: The day does not go well. }
+
+  - id: poem
+    if: ${{ steps.mood.outputs.answer == 'Good' }}
+    prompt: Write a two-line poem about a good day.
+    output:
+      type: object
+      required: [poem]
+      properties:
+        poem: { type: string }
+
+  - stop: ${{ steps.poem.outputs.poem || 'Tomorrow will be better.' }}

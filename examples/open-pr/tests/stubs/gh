@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# A stub of gh: no open PR, the default branch is main, and pr create prints a URL.
+case "$*" in
+  "repo view"*) echo main ;;
+  "pr view"*) exit 1 ;;
+  "pr create"*) echo "https://github.com/acme/app/pull/7" ;;
+  "pr edit"*) exit 0 ;;
+  *) echo "unexpected gh call: $*" >&2; exit 1 ;;
+esac

@@ -1,0 +1,87 @@
+# Open or update the GitHub pull request of the current branch.
+# The runner gathers the git context, pushes, and calls gh; the agent writes the title and the body.
+name: open-pr
+description: Create or update the GitHub pull request of the current branch.
+
+inputs:
+  auto:
+    type: boolean
+    default: false
+    description: Run unattended, with no questions. A new PR is always a draft.
+
+steps:
+  - id: context
+    run: context.sh
+
+  - if: ${{ !steps.context.outputs.branch }}
+    stop: The current commit is a detached HEAD. Create a branch first.
+    outcome: failure
+
+  - if: ${{ steps.context.outputs.branch == steps.context.outputs.base }}
+    stop: The current branch is the base branch. Use a separate branch.
+    outcome: failure
+
+  - if: ${{ !steps.context.outputs.commits }}
+    stop: The branch has no commits ahead of its base branch, so there is nothing to merge.
+    outcome: failure
+
+  - if: ${{ inputs.auto && steps.context.outputs.pr_number }}
+    stop: 'A PR already exists: ${{ steps.context.outputs.pr_url }}'
+
+  - id: existing
+    if: ${{ !inputs.auto && steps.context.outputs.pr_number }}
+    ask:
+      - id: answer
+        header: Existing PR
+        question: 'A PR already exists: ${{ steps.context.outputs.pr_url }}. Rewrite its title and description?'
+        options:
+          - { label: Rewrite, description: Rebuild the title and the body. Manual edits are lost. }
+          - { label: Keep, description: Push the new commits only. }
+
+  - id: draft
+    if: ${{ !inputs.auto && !steps.context.outputs.pr_number }}
+    ask:
+      - id: answer
+        header: Draft
+        question: Open the PR as a draft or ready for review?
+        options:
+          - { label: Draft, description: Open the PR as a draft. }
+          - { label: Ready, description: Open the PR ready for review. }
+
+  - id: push
+    run: push.sh
+
+  - if: ${{ steps.existing.outputs.answer == 'Keep' }}
+    stop: 'Pushed. The PR is unchanged: ${{ steps.context.outputs.pr_url }}'
+
+  - id: body-file
+    run: body-file.sh
+    env:
+      TEMPLATE: ${{ steps.context.outputs.template }}
+
+  - id: text
+    prompt-file: prompts/text.md
+    output:
+      type: object
+      required: [title]
+      properties:
+        title: { type: string, maxLength: 72 }
+
+  - id: create
+    if: ${{ !steps.context.outputs.pr_number }}
+    run: create.sh
+    env:
+      TITLE: ${{ steps.text.outputs.title }}
+      BASE: ${{ steps.context.outputs.base }}
+      BODY: ${{ steps.body-file.outputs.file }}
+      DRAFT: ${{ inputs.auto || steps.draft.outputs.answer == 'Draft' }}
+
+  - id: update
+    if: ${{ steps.context.outputs.pr_number }}
+    run: gh pr edit "$PR" --title "$TITLE" --body-file "$BODY"
+    env:
+      PR: ${{ steps.context.outputs.pr_number }}
+      TITLE: ${{ steps.text.outputs.title }}
+      BODY: ${{ steps.body-file.outputs.file }}
+
+  - stop: '${{ steps.update.outcome == ''success'' && ''PR updated'' || ''PR created'' }}: ${{ steps.create.outputs.url || steps.context.outputs.pr_url }}'

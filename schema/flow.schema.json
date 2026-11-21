@@ -1,0 +1,440 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://raw.githubusercontent.com/juanigalan91/skillflow/main/schema/flow.schema.json",
+  "title": "skillflow flow",
+  "description": "A deterministic flow for an AI agent skill. The runner does the run and stop steps; the agent does the skill, prompt and ask steps, one at a time.",
+  "type": "object",
+  "required": [
+    "name",
+    "steps"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "name": {
+      "$ref": "#/definitions/id",
+      "description": "The flow name. The state file and the done command use it."
+    },
+    "description": {
+      "type": "string"
+    },
+    "inputs": {
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^[A-Za-z_][A-Za-z0-9_-]*$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "type": {
+            "enum": [
+              "string",
+              "boolean",
+              "number"
+            ]
+          },
+          "default": {
+            "type": [
+              "string",
+              "boolean",
+              "number"
+            ]
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "description": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/definitions/step"
+      }
+    }
+  },
+  "definitions": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$"
+    },
+    "if": {
+      "type": [
+        "string",
+        "boolean"
+      ],
+      "description": "A ${{ }} expression or a bare expression. The step is skipped when it is false."
+    },
+    "outputSchema": {
+      "type": "object",
+      "description": "JSON Schema of the output that the agent reports. The runner validates it."
+    },
+    "promptFile": {
+      "type": "string",
+      "description": "A Markdown file with the instructions, relative to the flow file. Its ${{ }} expressions are filled."
+    },
+    "step": {
+      "oneOf": [
+        {
+          "$ref": "#/definitions/runStep"
+        },
+        {
+          "$ref": "#/definitions/skillStep"
+        },
+        {
+          "$ref": "#/definitions/promptStep"
+        },
+        {
+          "$ref": "#/definitions/askStep"
+        },
+        {
+          "$ref": "#/definitions/stopStep"
+        },
+        {
+          "$ref": "#/definitions/foreachStep"
+        },
+        {
+          "$ref": "#/definitions/usesStep"
+        },
+        {
+          "$ref": "#/definitions/breakStep"
+        }
+      ]
+    },
+    "runStep": {
+      "type": "object",
+      "description": "A shell step that the runner runs with bash. It writes outputs to $FLOW_OUTPUT.",
+      "required": [
+        "run"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/id"
+        },
+        "if": {
+          "$ref": "#/definitions/if"
+        },
+        "run": {
+          "type": "string",
+          "not": {
+            "pattern": "\\$\\{\\{"
+          },
+          "description": "Bash. Pass values with env: a ${{ }} in the command is a shell injection. The scripts/ folder next to the flow is in PATH."
+        },
+        "env": {
+          "type": "object",
+          "description": "Environment variables. Values can be ${{ }} expressions; a list becomes one line per item."
+        },
+        "continue-on-error": {
+          "type": "boolean",
+          "description": "Go on when the command fails. steps.<id>.outcome is then failure."
+        },
+        "until": {
+          "$ref": "#/definitions/if",
+          "description": "Poll: run the command again until this condition is true. steps.<id> holds the result of the last attempt."
+        },
+        "interval-seconds": {
+          "type": "number",
+          "description": "Poll: the wait between two attempts (default 30).",
+          "exclusiveMinimum": 0
+        },
+        "timeout-minutes": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Poll: the time limit (default 30). With no until, the time limit of one run (default 10)."
+        }
+      }
+    },
+    "skillStep": {
+      "type": "object",
+      "description": "The agent invokes another skill, then follows the optional instructions.",
+      "required": [
+        "id",
+        "skill"
+      ],
+      "not": {
+        "required": [
+          "prompt",
+          "prompt-file"
+        ]
+      },
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/id"
+        },
+        "if": {
+          "$ref": "#/definitions/if"
+        },
+        "skill": {
+          "type": "string"
+        },
+        "with": {
+          "type": "string",
+          "description": "The arguments of the skill."
+        },
+        "prompt": {
+          "type": "string"
+        },
+        "prompt-file": {
+          "$ref": "#/definitions/promptFile"
+        },
+        "output": {
+          "$ref": "#/definitions/outputSchema"
+        }
+      }
+    },
+    "promptStep": {
+      "type": "object",
+      "description": "The agent follows the instructions.",
+      "required": [
+        "id"
+      ],
+      "oneOf": [
+        {
+          "required": [
+            "prompt"
+          ]
+        },
+        {
+          "required": [
+            "prompt-file"
+          ]
+        }
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/id"
+        },
+        "if": {
+          "$ref": "#/definitions/if"
+        },
+        "prompt": {
+          "type": "string"
+        },
+        "prompt-file": {
+          "$ref": "#/definitions/promptFile"
+        },
+        "output": {
+          "$ref": "#/definitions/outputSchema"
+        }
+      }
+    },
+    "askStep": {
+      "type": "object",
+      "description": "The agent asks the user one or more multiple-choice questions.",
+      "required": [
+        "id",
+        "ask"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/id"
+        },
+        "if": {
+          "$ref": "#/definitions/if"
+        },
+        "ask": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/definitions/question"
+          }
+        }
+      }
+    },
+    "stopStep": {
+      "type": "object",
+      "description": "The runner ends the flow with a message.",
+      "required": [
+        "stop"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/id"
+        },
+        "if": {
+          "$ref": "#/definitions/if"
+        },
+        "stop": {
+          "type": "string"
+        },
+        "outcome": {
+          "enum": [
+            "success",
+            "failure"
+          ]
+        }
+      }
+    },
+    "question": {
+      "type": "object",
+      "required": [
+        "id",
+        "question",
+        "header"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/id"
+        },
+        "if": {
+          "$ref": "#/definitions/if"
+        },
+        "question": {
+          "type": "string"
+        },
+        "header": {
+          "type": "string",
+          "maxLength": 12
+        },
+        "multiSelect": {
+          "type": "boolean"
+        },
+        "options": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "oneOf": [
+              {
+                "type": "object",
+                "required": [
+                  "label",
+                  "description"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "preview": {
+                    "type": "string",
+                    "description": "Text that the question tool shows next to the option, for example a draft to approve."
+                  }
+                }
+              },
+              {
+                "type": "string",
+                "pattern": "^\\s*\\$\\{\\{[\\s\\S]*\\}\\}\\s*$",
+                "description": "An expression that gives a list of { label, description } options."
+              }
+            ]
+          }
+        },
+        "free": {
+          "type": "boolean",
+          "description": "The user answers with free text. Options are then optional suggestions."
+        }
+      },
+      "anyOf": [
+        {
+          "required": [
+            "options"
+          ]
+        },
+        {
+          "required": [
+            "free"
+          ],
+          "properties": {
+            "free": {
+              "const": true
+            }
+          }
+        }
+      ]
+    },
+    "foreachStep": {
+      "type": "object",
+      "description": "Runs the steps once for each item of a list. Inside, item is the current item and loop.index its position.",
+      "required": [
+        "id",
+        "foreach",
+        "steps"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/id"
+        },
+        "if": {
+          "$ref": "#/definitions/if"
+        },
+        "foreach": {
+          "type": [
+            "string",
+            "array"
+          ],
+          "description": "A ${{ }} expression that gives a list, or a list."
+        },
+        "steps": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/definitions/step"
+          }
+        }
+      }
+    },
+    "usesStep": {
+      "type": "object",
+      "description": "Runs another flow as one step. Its stop message and status become the outputs of this step.",
+      "required": [
+        "id",
+        "uses"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/id"
+        },
+        "if": {
+          "$ref": "#/definitions/if"
+        },
+        "uses": {
+          "type": "string",
+          "description": "The flow file, relative to this flow file."
+        },
+        "with": {
+          "type": "object",
+          "description": "The inputs of the other flow. Values can be ${{ }} expressions."
+        },
+        "continue-on-error": {
+          "type": "boolean",
+          "description": "Go on when the other flow fails."
+        }
+      }
+    },
+    "breakStep": {
+      "type": "object",
+      "description": "Ends the innermost foreach. The flow goes on after it.",
+      "required": [
+        "break"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/id"
+        },
+        "if": {
+          "$ref": "#/definitions/if"
+        },
+        "break": {
+          "const": true
+        }
+      }
+    }
+  }
+}
