@@ -14,7 +14,7 @@ const valid = 'name: sample\nsteps:\n  - id: build\n    run: echo hi\n    args: 
 
 describe('schema-aware YAML linting', () => {
   it.each(['rails.yaml', 'skills/lint-fixture/rails.yaml', 'examples/lint-fixture/rails.yaml', 'test/scenarios/skills/lint-fixture/gate.yaml'])(
-    'validates a workflow at %s against the shared schema', async (file) => {
+    'validates a rails file at %s against the shared schema', async (file) => {
       expect(await lint(valid, file)).toEqual([]);
       const messages = await lint(valid + 'unknown-key: true\n', file);
       expect(messages.some((message) => message.ruleId === 'json-schema-validator/no-invalid' && message.message.includes('unknown-key'))).toBe(true);
@@ -29,16 +29,16 @@ describe('schema-aware YAML linting', () => {
   });
 
   it('rejects wrong types and duplicate YAML keys', async () => {
-    const wrongType = await lint('name: sample\nsteps:\n  - run: echo hi\n    args: not-a-list\n');
+    const wrongType = await lint('name: sample\nsteps:\n  - run: echo hi\n    env: not-a-map\n');
     expect(wrongType.some((message) => message.ruleId === 'json-schema-validator/no-invalid')).toBe(true);
     const duplicate = await lint('name: first\nname: second\nsteps:\n  - stop: done\n');
     expect(duplicate.length).toBeGreaterThan(0);
   });
 
   it.each(['skills/lint-fixture/tests/sample.test.yaml', '.github/workflows/lint-fixture.yml'])(
-    'does not apply the workflow schema to %s', async (file) => {
+    'does not apply the rails schema to %s', async (file) => {
       const source = file.endsWith('.test.yaml')
-        ? 'flow: ../rails.yaml\nanswers: {}\nexpect: { status: done }\n'
+        ? 'rails: ../rails.yaml\nanswers: {}\nexpect: { status: done }\n'
         : 'name: CI\non: { pull_request: {} }\njobs: {}\n';
       expect(await lint(source, file)).toEqual([]);
     },

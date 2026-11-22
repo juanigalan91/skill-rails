@@ -7,4 +7,4 @@ if [ -n "$TEMPLATE" ]; then
 else
   printf '## Summary\n\n[1 sentence on the goal, then 2-4 bullet points]\n\n## Testing\n\n[How to test, or "No manual testing required"]\n' > "$file"
 fi
-echo "file=$file" >> "$FLOW_OUTPUT"
+echo "file=$file" >> "$RAILS_OUTPUT"

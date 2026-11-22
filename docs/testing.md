@@ -1,6 +1,6 @@
-# Testing flows
+# Testing
 
-`skill-rails test` runs a flow for real, with fixed answers in place of the agent.
+`skill-rails test` runs a rails file for real, with fixed answers in place of the agent.
 It finds the `*.test.yaml` files in all folders below its targets (not in `node_modules`, `.git`, `dist`, `coverage` or `.nx`), so a repository with many skills needs no script: put `skill-rails test . --quiet` in its test command.
 It needs no model, no network and no API key, so a test takes milliseconds and gives the same result every time.
 
@@ -15,15 +15,15 @@ skill-rails test --live --agent "codex exec"   # the same tests with another age
 
 ## A test file
 
-Put the tests of a flow in `tests/<name>.test.yaml`, next to `rails.yaml`.
+Put the tests of a rails file in `tests/<name>.test.yaml`, next to `rails.yaml`.
 A file has one test, or a `tests:` list whose items share the keys at the top.
 In a test, `env` and `path` add to the shared ones, and the other keys replace them.
 
 ```yaml
-flow: ../rails.yaml          # the flow to test, relative to this file
+rails: ../rails.yaml          # the rails file to test, relative to this file
 fixture: fixtures/repo      # copied into a new temp working directory
 git: true                   # git init and commit the fixture (default: true)
-setup: |                    # bash, run in the working directory before the flow
+setup: |                    # bash, run in the working directory before the run
   git checkout -q -b feat/x
 path: [stubs]               # folders put first in PATH, for stub commands
 env:                        # environment variables of the run steps
@@ -51,8 +51,8 @@ tests:
 - A list gives one answer per occurrence of the step, in order: a step in a `foreach` comes back once per item, and a step in a `repeat` once per iteration.
   `decide: [{ answer: Fix }, { answer: Skip }]`.
   A single answer is used for every occurrence.
-- In `expect.steps`, `<uses id>/<step id>` checks a step of another flow.
-- A step of another flow (a `uses` step) can have the key `<uses id>/<step id>`, for example `diagnose/decide`, when two flows have steps with the same id.
+- In `expect.steps`, `<uses id>/<step id>` checks a step of another rails file.
+- A step of another rails file (a `uses` step) can have the key `<uses id>/<step id>`, for example `diagnose/decide`, when two rails files have steps with the same id.
   The bare step id also works.
 - `$files` writes files in the working directory before the answer, for an agent step that changes files: `{ ok: true, $files: { notes.md: hello } }`.
 - `$fail` fails the step, as `done --fail` does: `{ $fail: The user stopped. }`.
@@ -67,13 +67,13 @@ The runner validates each answer against the output schema of its step, as it do
 |-----|--------|
 | `status` | `done`, `failed` or `error`. |
 | `message` | The final message. |
-| `steps` | The outcome of each step: `success`, `failure` or `skipped`. A step that the flow never reached is `not reached`. |
+| `steps` | The outcome of each step: `success`, `failure` or `skipped`. A step that the run never reached is `not reached`. |
 | `outputs` | `<step id>.<key>`: an output of a run step, or a property of an agent output. A longer path reads inside it, for example `fix.results[0].steps.apply.outputs.file`. |
-| `flow-outputs` | `<key>`: a value that the flow gives back with `outputs:`. A longer path works here too. |
+| `rails-outputs` | `<key>`: a value that the rails file gives back with `outputs:`. A longer path works here too. |
 | `files` | A file of the working directory: `exists`, `absent`, an exact content, or a regular expression. |
 | `notes` | The notes: `::warning::` lines on stdout, `WARNING:` lines on stderr, and `note` steps. |
 | `judge` | `<step id>: <rubric>`: a real agent grades the step output against the rubric (see [Judge](#judge)). |
-| `started` | `true` or `false`: whether the flow has a state. In agent mode, `false` means that the agent did not run the flow. |
+| `started` | `true` or `false`: whether the run has a state. In agent mode, `false` means that the agent did not start the run. |
 | `transcript` | Agent mode: `contains` and `absent` lists for the stdout of the agent. A string is a part of the text, and `/.../` is a regular expression. |
 
 A value that starts and ends with `/` is a regular expression.
@@ -81,16 +81,16 @@ Quote it in YAML when it holds `: ` or ` #`.
 
 ## Why a test fails
 
-- The flow asks for a step that has no answer: the path of the flow changed.
-- An answer is never used: the flow skipped a step that the test expects.
+- The run asks for a step that has no answer: the path of the run changed.
+- An answer is never used: the run skipped a step that the test expects.
 - An answer does not match the output schema of its step.
 - An expectation does not match.
 
 ## Stub commands
 
 A stub is a script in a folder of `path`, with the name of the command that it replaces.
-The `path` folders come before the `scripts/` folders of the flow and of its plugin, so that a stub can also replace a script.
-It answers the calls of the flow, and refuses the others so that a new call is visible:
+The `path` folders come before the `scripts/` folders of the rails file and of its plugin, so that a stub can also replace a script.
+It answers the calls of the run, and refuses the others so that a new call is visible:
 
 ```bash
 #!/usr/bin/env bash
@@ -107,7 +107,7 @@ Use an environment variable to choose a scenario, for example `GH_SCENARIO: fail
 
 ## What a test does not check
 
-A test checks what the flow does with the agent's answers: the order, the conditions, the scripts, the outputs and the files.
+A test checks what the run does with the agent's answers: the order, the conditions, the scripts, the outputs and the files.
 It does not check the quality of the agent's work (a diagnosis, a draft, a title).
 Check that with live steps and a judge, or with model evals.
 
@@ -155,19 +155,19 @@ expect:
   status: done
   judge:
     draft: The title says what the change does, in less than 70 characters.
-    review/decide: The decision names the failing check.   # a step of another flow
+    review/decide: The decision names the failing check.   # a step of another rails file
 ```
 
 With `judge-runs`, the failure says how many runs passed, for example `passed 2 of 3 runs`.
 
 ## Agent mode
 
-A test with `mode: agent` does not drive the flow.
-It gives `request` to the agent command, and then checks the expectations against the saved state of the flow: `status`, `message`, `steps`, `outputs`, `flow-outputs` and `files`.
+A test with `mode: agent` does not drive the run.
+It gives `request` to the agent command, and then checks the expectations against the saved state of the run: `status`, `message`, `steps`, `outputs`, `rails-outputs` and `files`.
 The setup, the fixture, `env`, `path`, `{{cwd}}` and `{{dir}}` work as in other tests.
 
 ```yaml
-flow: ../rails.yaml
+rails: ../rails.yaml
 mode: agent
 request: Run the skill in {{dir}}/../SKILL.md with auto=true.
 tests:
@@ -177,42 +177,42 @@ tests:
       status: done
       transcript:
         absent: ['"status":', 'skill-rails done']   # the agent hid the protocol JSON and commands
-  - name: a greeting does not start the flow
+  - name: a greeting does not start the run
     request: Hello!
     expect: { started: false }
 ```
 
-- Use it for a protocol smoke run on each host, and for trigger checks: `started: false` means that the agent did not run the flow.
+- Use it for a protocol smoke run on each host, and for trigger checks: `started: false` means that the agent did not start the run.
 - The agent command must have the skill available.
   For Claude Code, install the plugin, or name the path of the `SKILL.md` in the request.
 - A non-interactive run cannot answer `ask` steps.
-  Use flows with `auto` inputs, or with no `ask` step.
+  Use rails files with `auto` inputs, or with no `ask` step.
 - The same test runs on another host with another command, for example `--agent "codex exec"`.
 
 ## Record
 
-`skill-rails record <flow> [--out <file>]` writes a test file from the state of a real run, finished or running.
+`skill-rails record <rails> [--out <file>]` writes a test file from the state of a real run, finished or running.
 A real run becomes a regression test.
 
 ```bash
 skill-rails record open-pr --out skills/open-pr/tests/recorded.test.yaml
 ```
 
-- `flow:` is relative to the folder of `--out`, or absolute when the file goes to stdout.
+- `rails:` is relative to the folder of `--out`, or absolute when the file goes to stdout.
 - `inputs:` are the inputs of the run.
-- `answers:` hold what the agent reported for each agent step, with `<uses id>/<step id>` keys for the steps of other flows, and a list for a step that ran more than once.
+- `answers:` hold what the agent reported for each agent step, with `<uses id>/<step id>` keys for the steps of other rails files, and a list for a step that ran more than once.
   A `--fail` becomes `$fail`.
-- `expect:` holds the status, the message and the outcome of each step of the flow.
+- `expect:` holds the status, the message and the outcome of each step of the run.
 
 The run steps of the recorded test call real commands.
 Add stubs for the network commands, and `$files` for the files that the agent wrote.
 
 ## Trace
 
-`skill-rails trace <flow>` prints one JSON line per agent step of a run:
+`skill-rails trace <rails>` prints one JSON line per agent step of a run:
 
 ```json
-{"flow":"open-pr","path":"review/decide","id":"decide","request":{"type":"prompt","instructions":"..."},"answer":{"fix":true},"outcome":"success"}
+{"rails":"open-pr","path":"review/decide","id":"decide","request":{"type":"prompt","instructions":"..."},"answer":{"fix":true},"outcome":"success"}
 ```
 
 Each line is an eval case: the exact input and output of one step of a real run.

@@ -1,8 +1,9 @@
 import path from 'node:path';
+import yaml from 'js-yaml';
 // The engine: runs the run, stop, foreach, repeat and uses steps, and stops at the next step for the agent.
-// The state is a stack of frames: the root flow, then one frame per sub-flow and per foreach or repeat iteration.
+// The state is a stack of frames: the root rails file, then one frame per nested rails file and per foreach or repeat iteration.
 import { condition, render, text } from './expressions.js';
-import { kindOf } from './flow.js';
+import { kindOf } from './rails.js';
 import { runCommand } from './run.js';
 import { validateOutput } from './schema.js';
 import type {
@@ -11,7 +12,7 @@ import type {
   Exec,
   ForeachStep,
   Frame,
-  Flow,
+  Rails,
   InputSpec,
   InputValue,
   JsonObject,
@@ -93,15 +94,15 @@ export function resolveInputs(spec: Record<string, InputSpec>, given: Record<str
   return values;
 }
 
-export function newState(flow: Flow, given: Record<string, unknown> = {}, cwd = process.cwd()): State {
-  const root: Frame = { kind: 'root', name: flow.name, dir: flow.dir, steps: flow.steps, index: 0, inputs: resolveInputs(flow.inputs, given), results: {}, outputs: flow.outputs, onFailure: flow['on-failure'] };
-  return { flow, cwd, frames: [root], notes: [], status: 'running', pending: null, message: null };
+export function newState(rails: Rails, given: Record<string, unknown> = {}, cwd = process.cwd()): State {
+  const root: Frame = { kind: 'root', name: rails.name, dir: rails.dir, steps: rails.steps, index: 0, inputs: resolveInputs(rails.inputs, given), results: {}, outputs: rails.outputs, onFailure: rails['on-failure'] };
+  return { rails, cwd, frames: [root], notes: [], status: 'running', pending: null, message: null };
 }
 
 const top = (state: State): Frame => state.frames[state.frames.length - 1] as Frame;
 
-/** The frames of the current flow (root or sub-flow), outer first: a flow sees its own steps only. */
-function currentFlowFrames(state: State): Frame[] {
+/** The frames of the current rails file (root or nested), outer first: a rails file sees its own steps only. */
+function currentRailsFrames(state: State): Frame[] {
   const frames: Frame[] = [];
   for (let i = state.frames.length - 1; i >= 0; i--) {
     const frame = state.frames[i] as Frame;
@@ -111,7 +112,7 @@ function currentFlowFrames(state: State): Frame[] {
   return frames;
 }
 
-/** The folder of the innermost flow with a working-directory, else the project. */
+/** The folder of the innermost rails file with a working-directory, else the project. */
 function frameCwd(state: State): string {
   return [...state.frames].reverse().find((frame) => frame.cwd)?.cwd ?? state.cwd;
 }
@@ -130,17 +131,17 @@ function loopContext(loops: Frame[]): Context['loop'] {
 }
 
 function contextOf(state: State): Context {
-  const frames = currentFlowFrames(state);
-  const flowFrame = frames[0] as Frame;
+  const frames = currentRailsFrames(state);
+  const railsFrame = frames[0] as Frame;
   const inner = [...frames].reverse();
   const foreach = inner.find((frame) => frame.kind === 'foreach');
   return {
-    inputs: flowFrame.inputs,
+    inputs: railsFrame.inputs,
     steps: Object.assign({}, ...frames.map((frame) => frame.results)),
     env: { ...process.env },
-    flow: { name: flowFrame.name, dir: flowFrame.dir },
+    rails: { name: railsFrame.name, dir: railsFrame.dir },
     item: foreach?.items?.[foreach.position ?? 0] ?? null,
-    failure: flowFrame.failure ?? null,
+    failure: railsFrame.failure ?? null,
     loop: loopContext(inner.filter((frame) => frame.kind === 'foreach' || frame.kind === 'repeat')),
   };
 }
@@ -149,20 +150,20 @@ export function finish(state: State, status: 'done' | 'failed', message: string 
   Object.assign(state, { status, message: message || null, pending: null });
 }
 
-/** The declared outputs of the flow of the top frame: an object, or { value } for another result. */
-function flowOutputs(state: State, spec: Frame['outputs']): Record<string, unknown> | undefined {
+/** The declared outputs of the rails file of the top frame: an object, or { value } for another result. */
+function railsOutputs(state: State, spec: Frame['outputs']): Record<string, unknown> | undefined {
   if (spec === undefined) return undefined;
   const value = render(spec, contextOf(state));
   return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : { value };
 }
 
-/** Ends the current flow. A sub-flow becomes the result of its uses step; a failure goes up unless continue-on-error. */
-function endFlow(state: State, status: 'done' | 'failed', message: string | null, stopped = false): void {
+/** Ends the current rails file. A nested rails file becomes the result of its uses step; a failure goes up unless continue-on-error. */
+function endRails(state: State, status: 'done' | 'failed', message: string | null, stopped = false): void {
   for (;;) {
     const frame = top(state);
-    if (frame.kind === 'root' || frame.kind === 'flow') {
+    if (frame.kind === 'root' || frame.kind === 'rails') {
       if (frame.failure) {
-        // The failure steps ended: the flow fails with its first reason.
+        // The failure steps ended: the run fails with its first reason.
         status = 'failed';
         message = frame.failure.message;
       } else if (status === 'failed' && frame.onFailure?.length) {
@@ -173,10 +174,10 @@ function endFlow(state: State, status: 'done' | 'failed', message: string | null
       }
     }
     if (frame.kind === 'root') {
-      state.outputs = flowOutputs(state, frame.outputs);
+      state.outputs = railsOutputs(state, frame.outputs);
       return finish(state, status, message);
     }
-    const declared = frame.kind === 'flow' ? flowOutputs(state, frame.outputs) : undefined;
+    const declared = frame.kind === 'rails' ? railsOutputs(state, frame.outputs) : undefined;
     if (frame.kind === 'foreach' || frame.kind === 'repeat') {
       // Keep the current iteration when a failure or stop unwinds the loop, so
       // record/trace retain its agent requests and answers as well as earlier ones.
@@ -193,16 +194,16 @@ function endFlow(state: State, status: 'done' | 'failed', message: string | null
       };
     }
     state.frames.pop();
-    if (frame.kind !== 'flow') continue;
+    if (frame.kind !== 'rails') continue;
     const parent = top(state);
     const uses = parent.steps[parent.index] as UsesStep;
     // The declared outputs come first: status, message and steps keep their meaning.
     parent.results[frame.id as string] = { outcome: status === 'done' ? 'success' : 'failure', outputs: { ...declared, status, message, steps: frame.results } };
     if (status === 'failed' && !uses['continue-on-error']) {
-      message = `Step "${frame.id}" failed: ${message ?? 'the flow failed'}`;
+      message = `Step "${frame.id}" failed: ${message ?? 'the other rails file failed'}`;
       continue;
     }
-    // A stop of the other flow also ends this flow, with the same message.
+    // A stop of the other rails file also ends this one, with the same message.
     if (stopped && uses['forward-stop']) continue;
     parent.index += 1;
     return;
@@ -212,7 +213,7 @@ function endFlow(state: State, status: 'done' | 'failed', message: string | null
 /** The current frame has no more steps, or a break ends its loop. */
 function endFrame(state: State, broken = false): void {
   const frame = top(state);
-  if (frame.kind === 'root' || frame.kind === 'flow') return endFlow(state, 'done', null);
+  if (frame.kind === 'root' || frame.kind === 'rails') return endRails(state, 'done', null);
   if (frame.kind === 'repeat') return endRepeat(state, frame, broken);
   const items = frame.items ?? [];
   const position = frame.position ?? 0;
@@ -305,14 +306,22 @@ function askStep(step: AskStep, context: Context): PendingStep | null {
   };
 }
 
+/** The values of a with map, as a YAML block. */
+const valuesBlock = (values: unknown): string => yaml.dump(values, { lineWidth: -1, noRefs: true, skipInvalid: true }).trimEnd();
+
 function agentStep(step: SkillStep | PromptStep, kind: 'skill' | 'prompt', context: Context): PendingStep {
   const skillStep = kind === 'skill' ? (step as SkillStep) : undefined;
+  const values = step.with === undefined ? undefined : render(step.with, context);
+  const map = values !== undefined && typeof step.with === 'object' ? valuesBlock(values) : undefined;
+  let instructions = step.prompt === undefined ? undefined : text(render(step.prompt, context));
+  // A prompt step gets its values after the instructions; a skill step gets them as its arguments.
+  if (kind === 'prompt' && map !== undefined) instructions = `${instructions?.trimEnd()}\n\nValues:\n\n\`\`\`yaml\n${map}\n\`\`\``;
   return {
     id: step.id,
     type: kind,
     skill: skillStep?.skill,
-    args: skillStep?.with === undefined ? undefined : text(render(skillStep.with, context)),
-    instructions: step.prompt === undefined ? undefined : text(render(step.prompt, context)),
+    args: kind === 'skill' && values !== undefined ? (map ?? text(values)) : undefined,
+    instructions,
     output: step.output,
   };
 }
@@ -332,7 +341,7 @@ function runStep(state: State, step: RunStep, id: string, exec: Exec): void {
     const context = contextOf(state);
     const result = exec(step.run, {
       env: render(step.env ?? {}, context) as Record<string, unknown>,
-      args: render(step.args ?? [], context) as unknown[],
+      args: [render(step.args ?? [], context)].flat(),
       stdout: step.stdout,
       dir: frame.dir,
       cwd: step['working-directory'] ? path.resolve(frameCwd(state), text(render(step['working-directory'], context))) : frameCwd(state),
@@ -349,7 +358,7 @@ function runStep(state: State, step: RunStep, id: string, exec: Exec): void {
     if (result) Object.assign(result, { outcome: 'failure', error: error ?? message });
     const go = step['continue-on-error'];
     if (go === true || (Array.isArray(go) && result?.exitCode !== undefined && go.includes(result.exitCode))) frame.index += 1;
-    else endFlow(state, 'failed', message);
+    else endRails(state, 'failed', message);
   };
 
   if (step.until === undefined) {
@@ -394,7 +403,7 @@ function runStep(state: State, step: RunStep, id: string, exec: Exec): void {
   }
 }
 
-/** Runs steps until the flow ends or a step waits for the agent. */
+/** Runs steps until the run ends or a step waits for the agent. */
 export function advance(state: State, { exec = runCommand }: { exec?: Exec } = {}): void {
   while (state.status === 'running' && !state.pending) {
     const frame = top(state);
@@ -416,7 +425,7 @@ export function advance(state: State, { exec = runCommand }: { exec?: Exec } = {
       case 'fail': {
         const stop = step as StopStep;
         const failed = kind === 'fail' || stop.outcome === 'failure';
-        endFlow(state, failed ? 'failed' : 'done', text(render(stop.fail ?? stop.stop ?? '', context)), true);
+        endRails(state, failed ? 'failed' : 'done', text(render(stop.fail ?? stop.stop ?? '', context)), true);
         break;
       }
       case 'run':
@@ -430,7 +439,12 @@ export function advance(state: State, { exec = runCommand }: { exec?: Exec } = {
         break;
       }
       case 'set':
-        frame.results[id] = { outcome: 'success', outputs: render((step as SetStep).set, context) as Record<string, unknown> };
+        {
+        // An expression that gives an object sets all its keys; any other value is outputs.value.
+        const values = render((step as SetStep).set, context);
+        const outputs = values && typeof values === 'object' && !Array.isArray(values) ? (values as Record<string, unknown>) : { value: values };
+        frame.results[id] = { outcome: 'success', outputs };
+      }
         frame.index += 1;
         break;
       case 'break':
@@ -441,7 +455,7 @@ export function advance(state: State, { exec = runCommand }: { exec?: Exec } = {
         const foreach = step as ForeachStep;
         const items = typeof foreach.foreach === 'string' ? render(foreach.foreach, context) : foreach.foreach;
         if (!Array.isArray(items)) {
-          endFlow(state, 'failed', `Step "${id}": foreach needs a list, and got ${JSON.stringify(items)}.`);
+          endRails(state, 'failed', `Step "${id}": foreach needs a list, and got ${JSON.stringify(items)}.`);
           break;
         }
         if (!items.length) {
@@ -462,17 +476,17 @@ export function advance(state: State, { exec = runCommand }: { exec?: Exec } = {
       }
       case 'uses': {
         const uses = step as UsesStep;
-        const child = uses.flow as Flow;
+        const child = uses.rails as Rails;
         let inputs: Record<string, InputValue>;
         try {
           inputs = resolveInputs(child.inputs, render(uses.with ?? {}, context) as Record<string, unknown>);
         } catch (error) {
-          endFlow(state, 'failed', `Step "${id}" (${uses.uses}): ${(error as Error).message}`);
+          endRails(state, 'failed', `Step "${id}" (${uses.uses}): ${(error as Error).message}`);
           break;
         }
         const workdir = uses['working-directory'] ? path.resolve(frameCwd(state), text(render(uses['working-directory'], context))) : undefined;
         state.frames.push({
-          kind: 'flow', id, name: child.name, dir: child.dir, steps: child.steps, index: 0, inputs, results: {}, outputs: child.outputs,
+          kind: 'rails', id, name: child.name, dir: child.dir, steps: child.steps, index: 0, inputs, results: {}, outputs: child.outputs,
           onFailure: child['on-failure'], ...(workdir ? { cwd: workdir } : {}),
         });
         break;
@@ -491,9 +505,9 @@ export function advance(state: State, { exec = runCommand }: { exec?: Exec } = {
   }
 }
 
-/** Records the output of the waiting step. Returns the errors; none when the flow can go on. */
+/** Records the output of the waiting step. Returns the errors; none when the run can go on. */
 export function submit(state: State, id: string, output: unknown = {}): string[] {
-  if (!state.pending) return [`no step waits for an output: the flow is ${state.status}`];
+  if (!state.pending) return [`no step waits for an output: the run is ${state.status}`];
   if (state.pending.id !== id) return [`the current step is "${state.pending.id}", not "${id}"`];
   if (state.pending.type === 'wait') {
     // The poll goes on from where it stopped: the step keeps its place.
@@ -502,11 +516,26 @@ export function submit(state: State, id: string, output: unknown = {}): string[]
   }
   const errors = validateOutput(state.pending.output ?? { type: 'object' }, output);
   if (errors.length) return errors;
+  if (state.pending.asked) {
+    const changed = changedAnswers(state.pending.asked, output as Record<string, unknown>);
+    if (changed.length) return changed;
+  }
   const frame = top(state);
   frame.results[id] = { outcome: 'success', outputs: answerValues(state.pending, output as Record<string, unknown>), request: requestOf(state.pending), answer: output };
   state.pending = null;
   frame.index += 1;
   return [];
+}
+
+/** The reported answers that differ from what the user answered in the question tool. */
+function changedAnswers(asked: Record<string, unknown>, output: Record<string, unknown>): string[] {
+  const same = (reported: unknown, answer: unknown) =>
+    Array.isArray(reported)
+      ? (Array.isArray(answer) ? JSON.stringify(answer) === JSON.stringify(reported) : String(answer) === reported.join(', '))
+      : String(reported) === String(answer);
+  return Object.entries(asked)
+    .filter(([id, answer]) => !same(output[id], answer))
+    .map(([id, answer]) => `${id}: the user answered ${JSON.stringify(answer)} in the question tool; report that answer`);
 }
 
 /** What the agent was asked, without the empty keys. */
@@ -534,11 +563,11 @@ export function failPending(state: State, id: string, reason: string): string[] 
   frame.results[id] = { outcome: 'failure', error: reason, request, answer: { $fail: reason } };
   const step = frame.steps[frame.index] as { 'continue-on-error'?: unknown };
   if (step['continue-on-error'] === true) frame.index += 1;
-  else endFlow(state, 'failed', reason);
+  else endRails(state, 'failed', reason);
   return [];
 }
 
-/** The step results of the root flow. */
+/** The step results of the root rails file. */
 export const rootResults = (state: State) => (state.frames[0] as Frame).results;
 
 /** What the agent reads after each command. The notes are shown once. */
@@ -546,9 +575,9 @@ export function report(state: State): Report {
   const notes = state.notes.splice(0);
   const extra = notes.length ? { notes } : {};
   if (state.pending) {
-    const { values: _, ...pending } = state.pending;
-    return { status: 'step', flow: state.flow.name, ...pending, ...extra };
+    const { values: _, asked: __, ...pending } = state.pending;
+    return { status: 'step', rails: state.rails.name, ...pending, ...extra };
   }
   const outputs = state.outputs ? { outputs: state.outputs } : {};
-  return { status: state.status, flow: state.flow.name, message: state.message, ...outputs, ...extra };
+  return { status: state.status, rails: state.rails.name, message: state.message, ...outputs, ...extra };
 }

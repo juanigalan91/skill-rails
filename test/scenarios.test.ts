@@ -5,7 +5,7 @@ import { runTests } from '../src/testing.js';
 
 const scenarios = path.join(path.dirname(fileURLToPath(import.meta.url)), 'scenarios');
 
-it('passes the flow tests of the scenario plugin', () => {
+it('passes the tests of the scenario plugin', () => {
   const failed = runTests([scenarios]).filter((result) => !result.passed);
   expect(failed.map((result) => `${result.name}: ${result.failures.join('; ')}`)).toEqual([]);
 }, 120_000);

@@ -1,4 +1,4 @@
-flow: ../rails.yaml
+rails: ../rails.yaml
 git: false
 path:
   - stubs
@@ -24,7 +24,7 @@ tests:
             steps:
               - stop: generated safely
           generated/tests/generated.test.yaml: |
-            flow: ../rails.yaml
+            rails: ../rails.yaml
             git: false
             expect:
               status: done
@@ -50,7 +50,7 @@ tests:
           name: generated
           steps:
             - stop: generated safely
-  - name: repairs an invalid flow before smoke testing
+  - name: repairs an invalid rails file before smoke testing
     answers:
       plan:
         name: generated
@@ -72,7 +72,7 @@ tests:
             steps:
               - stop: generated safely
           generated/tests/generated.test.yaml: |
-            flow: ../rails.yaml
+            rails: ../rails.yaml
             git: false
             expect:
               status: done
@@ -193,7 +193,7 @@ tests:
             steps:
               - stop: generated safely
           literal;$(touch injected) 'quoted'/tests/generated.test.yaml: |
-            flow: ../rails.yaml
+            rails: ../rails.yaml
             git: false
             expect:
               status: done
@@ -231,7 +231,7 @@ tests:
             steps:
               - stop: generated safely
           generated/tests/generated.test.yaml: |
-            flow: ../rails.yaml
+            rails: ../rails.yaml
             git: false
             expect:
               status: done
@@ -264,7 +264,7 @@ tests:
             steps:
               - stop: generated safely
           generated/tests/generated.test.yaml: |
-            flow: ../rails.yaml
+            rails: ../rails.yaml
             git: false
             expect:
               status: done

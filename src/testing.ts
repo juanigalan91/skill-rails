@@ -1,4 +1,4 @@
-// Deterministic flow tests: the flow runs for real, and fixed answers stand in for the agent.
+// Deterministic skill tests: the rails file runs for real, and fixed answers stand in for the agent.
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -7,7 +7,7 @@ import yaml from 'js-yaml';
 import { done, start } from './api.js';
 import { readState } from './state.js';
 import { rootResults } from './engine.js';
-import { loadFlow } from './flow.js';
+import { loadRails } from './rails.js';
 import type { PendingStep, Report, State, StepResult } from './types.js';
 
 const MAX_STEPS = 500;
@@ -34,12 +34,12 @@ export interface TestCase {
   name: string;
   /** The test file, for relative paths. */
   file: string;
-  flow: string;
+  rails: string;
   /** A folder copied into the temp working directory. */
   fixture?: string;
   /** Run `git init` and commit the fixture (default true). */
   git?: boolean;
-  /** Bash commands run in the working directory before the flow. `{{cwd}}` and `{{dir}}` work here too. */
+  /** Bash commands run in the working directory before the run. `{{cwd}}` and `{{dir}}` work here too. */
   setup?: string;
   inputs?: Record<string, unknown>;
   env?: Record<string, string>;
@@ -51,7 +51,7 @@ export interface TestCase {
    * A list gives one answer per occurrence of the step, in order (a step in a foreach or a repeat comes back once per iteration).
    */
   answers?: Record<string, Answer | Answer[]>;
-  /** agent: the agent command does the request, and the expectations read the saved state of the flow. */
+  /** agent: the agent command does the request, and the expectations read the saved state of the run. */
   mode?: 'agent';
   request?: string;
   /** Run the test this number of times; every run must pass. */
@@ -62,13 +62,13 @@ export interface TestCase {
     steps?: Record<string, StepResult['outcome']>;
     /** `<step id>.<key>`: an output of a step; a deeper path reads inside it, for example `fix.results[0].steps`. */
     outputs?: Record<string, Matcher>;
-    /** `<key>`: an output that the flow gives back (its `outputs:`), at the end. */
-    'flow-outputs'?: Record<string, Matcher>;
+    /** `<key>`: an output that the rails file gives back (its `outputs:`), at the end. */
+    'rails-outputs'?: Record<string, Matcher>;
     files?: Record<string, Matcher>;
     notes?: Matcher[];
     /** `<step id>` or `<uses id>/<step id>`: a rubric that a real agent grades the step output against. */
     judge?: Record<string, string>;
-    /** Whether the flow has a state: false means that the agent did not run the flow. */
+    /** Whether the run has a state: false means that the agent did not start the run. */
     started?: boolean;
     /** The stdout of the agent, in agent mode: a string is a part of it. */
     transcript?: { contains?: Matcher[]; absent?: Matcher[] };
@@ -124,8 +124,8 @@ export function loadTests(file: string): TestCase[] {
       env: { ...(shared.env as object), ...(test.env as object) },
       path: [...((test.path as string[]) ?? []), ...((shared.path as string[]) ?? [])],
     } as Partial<TestCase>;
-    if (!merged.flow) throw new Error(`${file}: a test needs a flow`);
-    return { ...merged, flow: merged.flow, file, name: merged.name ?? (tests ? `test ${index + 1}` : path.basename(file)) } as TestCase;
+    if (!merged.rails) throw new Error(`${file}: a test needs a rails key`);
+    return { ...merged, rails: merged.rails, file, name: merged.name ?? (tests ? `test ${index + 1}` : path.basename(file)) } as TestCase;
   });
 }
 
@@ -178,11 +178,11 @@ function prepare(test: TestCase, dir: string, cwd: string): void {
   }
 }
 
-/** The answer of a step: `<uses id>/<step id>` for a step of another flow (the longest path first), else the step id. */
-function answerKey(answers: Record<string, unknown>, id: string, flow: string, cwd: string): string {
+/** The answer of a step: `<uses id>/<step id>` for a step of another rails file (the longest path first), else the step id. */
+function answerKey(answers: Record<string, unknown>, id: string, rails: string, cwd: string): string {
   let scope: string[] = [];
   try {
-    scope = readState(flow, cwd).frames.filter((frame) => frame.kind === 'flow').map((frame) => frame.id as string);
+    scope = readState(rails, cwd).frames.filter((frame) => frame.kind === 'rails').map((frame) => frame.id as string);
   } catch {
     return id;
   }
@@ -265,7 +265,7 @@ const SCHEMA_LINE = 'Reply with one JSON value that matches this JSON schema, an
 /** The prompt of a live step: what the agent of a real run would read. */
 export function stepPrompt(step: PendingStep, guidance = ''): string {
   const parts: string[] = [];
-  if (step.type === 'ask') parts.push('You play the user of a flow. Answer these questions as the user would:', JSON.stringify(step.questions, null, 2));
+  if (step.type === 'ask') parts.push('You play the user of a skill. Answer these questions as the user would:', JSON.stringify(step.questions, null, 2));
   if (step.type === 'skill') parts.push(`Load the skill "${step.skill}"${step.args ? ` with these args: ${step.args}` : ''}, and do it.`);
   if (step.instructions) parts.push(step.instructions);
   if (step.directory) parts.push(`Do the step in this folder: ${step.directory}`);
@@ -277,7 +277,7 @@ export function stepPrompt(step: PendingStep, guidance = ''): string {
 /** The prompt that grades a step output against a rubric. */
 export function judgePrompt(id: string, rubric: string, output: unknown): string {
   return [
-    `Grade the output of the step "${id}" of a flow against this rubric.`,
+    `Grade the output of the step "${id}" of a skill against this rubric.`,
     `Rubric:\n${rubric}`,
     `Output (JSON):\n${JSON.stringify(output, null, 2)}`,
     `${SCHEMA_LINE}\n{"type":"object","required":["pass","reason"],"properties":{"pass":{"type":"boolean"},"reason":{"type":"string"}}}`,
@@ -290,7 +290,7 @@ interface Run {
   dir: string;
   cwd: string;
   agent: Agent;
-  flowName: string;
+  railsName: string;
   failures: string[];
   trace: string[];
   notes: string[];
@@ -300,7 +300,7 @@ interface Run {
 
 function stateOf(run: Run): State | undefined {
   try {
-    return readState(run.flowName, run.cwd);
+    return readState(run.railsName, run.cwd);
   } catch {
     return undefined;
   }
@@ -319,15 +319,15 @@ function liveStep(step: PendingStep, guidance: string, run: Run): Report {
       errors = [(error as Error).message];
       continue;
     }
-    const next = done({ flow: run.flowName, id: step.id, output, cwd: run.cwd });
+    const next = done({ rails: run.railsName, id: step.id, output, cwd: run.cwd });
     if (next.status !== 'invalid') return next;
     errors = next.errors;
   }
   throw new Error(`live step "${step.id}": the reply is not valid: ${errors.join('; ')}`);
 }
 
-/** Drives the flow with the answers of the test. Returns the last report. */
-function driveFlow(run: Run): Report {
+/** Drives the run with the answers of the test. Returns the last report. */
+function driveRails(run: Run): Report {
   const { test, cwd, failures, trace } = run;
   const vars = { cwd, dir: run.dir };
   const answers = substitute(test.answers ?? {}, vars);
@@ -336,21 +336,21 @@ function driveFlow(run: Run): Report {
     if ('notes' in r && r.notes) run.notes.push(...r.notes);
     return r;
   };
-  let report: Report = collect(start({ file: path.resolve(run.dir, test.flow), inputs: substitute(test.inputs ?? {}, vars), cwd }));
-  run.flowName = 'status' in report && 'flow' in report ? (report as { flow: string }).flow : '';
+  let report: Report = collect(start({ file: path.resolve(run.dir, test.rails), inputs: substitute(test.inputs ?? {}, vars), cwd }));
+  run.railsName = 'status' in report && 'rails' in report ? (report as { rails: string }).rails : '';
 
   for (let i = 0; report.status === 'step' && i < MAX_STEPS; i++) {
     const id = report.id;
     trace.push(id);
-    const key = answerKey(answers, id, run.flowName, cwd);
+    const key = answerKey(answers, id, run.railsName, cwd);
     const given = answers[key];
     const count = used.get(key) ?? 0;
     const answer = Array.isArray(given) ? given[count] : given;
     if (!answer) {
       failures.push(
         given
-          ? `the flow asked for step "${id}" a ${count + 1}th time, and the test has ${count} answers for it`
-          : `the flow asked for step "${id}" (${report.type}), and the test has no answer for it`,
+          ? `the run asked for step "${id}" a ${count + 1}th time, and the test has ${count} answers for it`
+          : `the run asked for step "${id}" (${report.type}), and the test has no answer for it`,
       );
       break;
     }
@@ -371,7 +371,7 @@ function driveFlow(run: Run): Report {
       fs.mkdirSync(path.dirname(target), { recursive: true });
       fs.writeFileSync(target, content);
     }
-    const next = done({ flow: run.flowName, id, output: $fail === undefined ? (Array.isArray(answer) ? answer : output) : undefined, fail: $fail, cwd });
+    const next = done({ rails: run.railsName, id, output: $fail === undefined ? (Array.isArray(answer) ? answer : output) : undefined, fail: $fail, cwd });
     if (next.status === 'invalid') {
       failures.push(`the answer of step "${id}" is not valid: ${next.errors.join('; ')}`);
       break;
@@ -381,26 +381,26 @@ function driveFlow(run: Run): Report {
   if (report.status === 'error') {
     // An expected error is checked with the other expectations: its errors become the message.
     if (test.expect?.status === 'error') report = { status: 'error', errors: report.errors, message: report.errors.join('\n') } as Report;
-    else failures.push(`the flow has errors: ${report.errors.join('; ')}`);
+    else failures.push(`the rails file has errors: ${report.errors.join('; ')}`);
   }
   for (const [id, given] of Object.entries(answers)) {
     if (failures.length) break;
     const count = used.get(id) ?? 0;
-    if (!count) failures.push(`the flow never asked for step "${id}"`);
-    else if (Array.isArray(given) && count < given.length) failures.push(`the flow asked for step "${id}" ${count} times, and the test has ${given.length} answers for it`);
+    if (!count) failures.push(`the run never asked for step "${id}"`);
+    else if (Array.isArray(given) && count < given.length) failures.push(`the run asked for step "${id}" ${count} times, and the test has ${given.length} answers for it`);
   }
-  run.flowName ||= (report as { flow?: string }).flow ?? '';
+  run.railsName ||= (report as { rails?: string }).rails ?? '';
   return report;
 }
 
-/** Agent mode: the agent does the request; the report comes from the saved state of the flow (null when it has none). */
+/** Agent mode: the agent does the request; the report comes from the saved state of the run (null when it has none). */
 function driveAgent(run: Run): Report | null {
   if (!run.test.request) throw new Error('a test with mode: agent needs a request');
-  run.flowName = loadFlow(path.resolve(run.dir, run.test.flow), { cwd: run.cwd }).name;
+  run.railsName = loadRails(path.resolve(run.dir, run.test.rails), { cwd: run.cwd }).name;
   run.transcript = run.agent(substitute(run.test.request, { cwd: run.cwd, dir: run.dir }), run.cwd, process.env);
   const state = stateOf(run);
   if (!state) return null;
-  return { status: state.status, flow: state.flow.name, message: state.message, ...(state.outputs ? { outputs: state.outputs } : {}) };
+  return { status: state.status, rails: state.rails.name, message: state.message, ...(state.outputs ? { outputs: state.outputs } : {}) };
 }
 
 /** The result of `<step id>` or `<uses id>/<step id>`. */
@@ -446,9 +446,9 @@ function checkExpectations(run: Run, report: Report | null): void {
     if (!matches(expected, actual ?? null)) failures.push(`output ${key}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual ?? null)}`);
   }
   const returned = report && 'outputs' in report ? report.outputs : undefined;
-  for (const [key, expected] of Object.entries(expect['flow-outputs'] ?? {})) {
+  for (const [key, expected] of Object.entries(expect['rails-outputs'] ?? {})) {
     const actual = at(returned, key);
-    if (!matches(expected, actual ?? null)) failures.push(`flow output ${key}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual ?? null)}`);
+    if (!matches(expected, actual ?? null)) failures.push(`rails output ${key}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual ?? null)}`);
   }
   for (const expected of expect.notes ?? []) {
     if (!run.notes.some((note) => matches(expected, note))) failures.push(`notes: no note matches ${JSON.stringify(expected)} (got ${JSON.stringify(run.notes)})`);
@@ -477,7 +477,7 @@ function checkExpectations(run: Run, report: Report | null): void {
 function runOnce(test: TestCase, agent: Agent): TestResult {
   const began = Date.now();
   const dir = path.dirname(path.resolve(test.file));
-  const run: Run = { test, dir, cwd: '', agent, flowName: '', failures: [], trace: [], notes: [] };
+  const run: Run = { test, dir, cwd: '', agent, railsName: '', failures: [], trace: [], notes: [] };
   const result = (): TestResult => ({ name: test.name, file: test.file, passed: run.failures.length === 0, failures: run.failures, trace: run.trace, ms: Date.now() - began });
 
   const stateDir = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-rails-state-'));
@@ -493,7 +493,7 @@ function runOnce(test: TestCase, agent: Agent): TestResult {
   return withEnv(env, () => {
     try {
       prepare(test, dir, cwd);
-      const report = test.mode === 'agent' ? driveAgent(run) : driveFlow(run);
+      const report = test.mode === 'agent' ? driveAgent(run) : driveRails(run);
       if (run.failures.length === 0) checkExpectations(run, report);
     } catch (error) {
       run.failures.push((error as Error).message);

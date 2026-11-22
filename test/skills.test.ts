@@ -8,7 +8,7 @@ import { tempDir } from './helpers.js';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 
-it('passes the bundled skills’ deterministic flow scenarios without a model or network', () => {
+it('passes the bundled skills’ deterministic rails scenarios without a model or network', () => {
   const results = runTests([path.join(root, 'skills')]);
   expect(results.filter((result) => !result.passed)).toEqual([]);
   expect(results.length).toBeGreaterThanOrEqual(17);
@@ -20,7 +20,7 @@ it('generates a wrapper command that treats its destination as a literal path', 
   try {
     const scaffold = spawnSync(process.execPath, [path.join(root, 'skills/create-skill-rails/scripts/scaffold.mjs')], {
       cwd, encoding: 'utf8',
-      env: { ...process.env, TARGET: target, NAME: 'generated', DESCRIPTION: 'A test skill.', FLOW_OUTPUT: path.join(cwd, 'outputs') },
+      env: { ...process.env, TARGET: target, NAME: 'generated', DESCRIPTION: 'A test skill.', RAILS_OUTPUT: path.join(cwd, 'outputs') },
     });
     expect(scaffold.status, scaffold.stderr).toBe(0);
     fs.writeFileSync(path.join(target, 'rails.yaml'), 'name: generated\nsteps:\n  - stop: safely started\n');
@@ -44,7 +44,7 @@ it('rejects a migration target outside its source before changing any files', ()
   try {
     const result = spawnSync(process.execPath, [path.join(root, 'skills/create-skill-rails/scripts/scaffold.mjs')], {
       cwd, encoding: 'utf8',
-      env: { ...process.env, SOURCE: path.join(cwd, 'source'), TARGET: path.join(cwd, 'other'), FLOW_OUTPUT: path.join(cwd, 'outputs') },
+      env: { ...process.env, SOURCE: path.join(cwd, 'source'), TARGET: path.join(cwd, 'other'), RAILS_OUTPUT: path.join(cwd, 'outputs') },
     });
     expect(result.status).not.toBe(0);
     expect(result.stderr).toContain('Migration target must be the source skill directory');

@@ -1,11 +1,11 @@
 // The commands that the CLI and the MCP server share. Each one returns the JSON report for the agent.
 import path from 'node:path';
 import { advance, failPending, finish, newState, report, rootResults, submit } from './engine.js';
-import { loadFlow } from './flow.js';
+import { loadRails } from './rails.js';
 import { readState, removeState, writeState } from './state.js';
 import type { Exec, Report, State, StepResult } from './types.js';
 
-export { loadFlow, validateFlow, FlowError } from './flow.js';
+export { loadRails, validateRails, RailsError } from './rails.js';
 export { advance, newState, submit, report } from './engine.js';
 export type * from './types.js';
 export { runTests, runTest, loadTests, findTests, commandAgent } from './testing.js';
@@ -29,10 +29,10 @@ function save(state: State): Report {
   return result;
 }
 
-/** Checks the flow, resets its state, runs until the first agent step. */
+/** Checks the rails file, resets the state of the run, runs until the first agent step. */
 export function start({ file, inputs = {}, cwd = process.cwd(), exec }: { file: string; inputs?: Record<string, unknown> } & CommonOptions): Report {
   try {
-    const state = { ...newState(loadFlow(file, { cwd }), inputs, cwd), file: path.resolve(file) };
+    const state = { ...newState(loadRails(file, { cwd }), inputs, cwd), file: path.resolve(file) };
     advance(state, { exec });
     return save(state);
   } catch (error) {
@@ -40,17 +40,17 @@ export function start({ file, inputs = {}, cwd = process.cwd(), exec }: { file: 
   }
 }
 
-/** Records the output of a step (or fails the flow), then runs until the next agent step. */
+/** Records the output of a step (or fails the run), then runs until the next agent step. */
 export function done({
-  flow,
+  rails,
   id,
   output,
   fail,
   cwd = process.cwd(),
   exec,
-}: { flow: string; id: string; output?: unknown; fail?: string } & CommonOptions): Report {
+}: { rails: string; id: string; output?: unknown; fail?: string } & CommonOptions): Report {
   try {
-    const state = readState(flow, cwd);
+    const state = readState(rails, cwd);
     if (fail !== undefined) {
       const errors = failPending(state, id, fail);
       if (errors.length) return { status: 'invalid', id, errors };
@@ -66,27 +66,27 @@ export function done({
   }
 }
 
-/** The current step again, or the end of the flow, with the step results. */
-export function status({ flow, cwd = process.cwd() }: { flow: string; cwd?: string }): Report | (Report & { results: Record<string, StepResult> }) {
+/** The current step again, or the end of the run, with the step results. */
+export function status({ rails, cwd = process.cwd() }: { rails: string; cwd?: string }): Report | (Report & { results: Record<string, StepResult> }) {
   try {
-    const state = readState(flow, cwd);
+    const state = readState(rails, cwd);
     return { ...report(state), cwd: state.cwd, results: rootResults(state) };
   } catch (error) {
     return errorReport(error);
   }
 }
 
-/** Deletes the state of a flow. */
-export function reset({ flow, cwd = process.cwd() }: { flow: string; cwd?: string }): Report {
-  removeState(flow, cwd);
-  return { status: 'reset', flow };
+/** Deletes the state of a run. */
+export function reset({ rails, cwd = process.cwd() }: { rails: string; cwd?: string }): Report {
+  removeState(rails, cwd);
+  return { status: 'reset', rails };
 }
 
-/** Checks a flow file without running it. */
+/** Checks a rails file without running it. */
 export function check({ file, cwd = process.cwd() }: { file: string; cwd?: string }): Report {
   try {
-    const flow = loadFlow(file, { cwd });
-    return { status: 'ok', flow: flow.name, steps: flow.steps.length };
+    const rails = loadRails(file, { cwd });
+    return { status: 'ok', rails: rails.name, steps: rails.steps.length };
   } catch (error) {
     return errorReport(error);
   }

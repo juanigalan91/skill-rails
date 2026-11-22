@@ -30,7 +30,7 @@ steps:
         question: "This skill is better as Markdown: ${{ join(steps.assess.outputs.reasons, '; ') }}"
         options:
           - { label: Keep it as Markdown (Recommended), description: Change nothing., value: keep }
-          - { label: Migrate anyway, description: Write the flow and replace the SKILL.md., value: migrate }
+          - { label: Migrate anyway, description: Write the rails file and replace the SKILL.md., value: migrate }
   - if: ${{ steps.assess.outputs.verdict == 'keep' && steps.confirm.outputs.choice != 'migrate' }}
     stop: "Kept as Markdown, with no change: ${{ join(steps.assess.outputs.reasons, '; ') }}"
   - id: audit

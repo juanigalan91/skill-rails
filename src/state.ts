@@ -1,4 +1,4 @@
-// One state file per flow name and working directory.
+// One state file per rails name and working directory.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -14,13 +14,13 @@ export function statePath(name: string, cwd: string): string {
 
 export function readState(name: string, cwd: string): State {
   const file = statePath(name, cwd);
-  if (!fs.existsSync(file)) throw new Error(`no flow "${name}" was started in ${cwd}`);
+  if (!fs.existsSync(file)) throw new Error(`no run of "${name}" was started in ${cwd}`);
   return JSON.parse(fs.readFileSync(file, 'utf8')) as State;
 }
 
 export function writeState(state: State): void {
   fs.mkdirSync(stateDir(), { recursive: true });
-  fs.writeFileSync(statePath(state.flow.name, state.cwd), JSON.stringify(state));
+  fs.writeFileSync(statePath(state.rails.name, state.cwd), JSON.stringify(state));
 }
 
 export function removeState(name: string, cwd: string): void {

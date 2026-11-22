@@ -1,6 +1,6 @@
-# The flow format
+# The rails file format
 
-A flow is a YAML file, checked against [`schema/flow.schema.json`](../schema/flow.schema.json).
+A rails file (`rails.yaml`) is a YAML file, checked against [`schema/rails.schema.json`](../schema/rails.schema.json).
 The runner goes through its steps in order.
 It runs the `run` and `stop` steps itself, and it gives the `skill`, `prompt` and `ask` steps to the agent, one at a time.
 
@@ -14,7 +14,7 @@ inputs:
     description: Run with no questions.
   mode:
     enum: [draft, ready]      # the allowed values: the start fails with any other value
-outputs:                      # what the flow gives back at its end (optional)
+outputs:                      # what the rails file gives back at its end (optional)
   url: ${{ steps.create.outputs.url }}
 steps:
   - id: context
@@ -32,19 +32,19 @@ steps:
 
 ## YAML linting
 
-Run `yarn lint` from the checkout to check all YAML syntax and validate workflows against `schema/flow.schema.json`. ESLint uses `eslint-plugin-yml` and `eslint-plugin-json-schema-validator`; schema validation uses the local file and disables SchemaStore lookups. Changes to allowed keys in the schema therefore apply to linting too.
+Run `yarn lint` from the checkout to check all YAML syntax and validate rails files against `schema/rails.schema.json`. ESLint uses `eslint-plugin-yml` and `eslint-plugin-json-schema-validator`; schema validation uses the local file and disables SchemaStore lookups. Changes to allowed keys in the schema therefore apply to linting too.
 
-Workflow schema checks cover `rails.yaml`/`rails.yml` and YAML subflows under `skills/`, `examples/`, and `test/scenarios/skills/`. Test definitions (`*.test.yaml`, `*.test.yml`, and files under `tests/`) and GitHub Actions files receive YAML syntax checks without the workflow schema, because they use different formats. Ignored dependency/build directories are excluded.
+Schema checks cover `rails.yaml`/`rails.yml` and nested rails files under `skills/`, `examples/`, and `test/scenarios/skills/`. Test definitions (`*.test.yaml`, `*.test.yml`, and files under `tests/`) and GitHub Actions files receive YAML syntax checks without the rails schema, because they use different formats. Ignored dependency/build directories are excluded.
 
-Install the recommended **YAML** (Red Hat) and **ESLint** extensions in VS Code or Cursor. The repository settings associate workflows with the same local schema for allowed-key completion and validation. For a workflow outside the configured paths, add its glob to both `eslint.config.js` and `.vscode/settings.json`.
+Install the recommended **YAML** (Red Hat) and **ESLint** extensions in VS Code or Cursor. The repository settings associate rails files with the same local schema for allowed-key completion and validation. For a rails file outside the configured paths, add its glob to both `eslint.config.js` and `.vscode/settings.json`.
 
-Linting checks YAML structure, keys, and types. Use `skill-rails check path/to/rails.yaml` for runner-specific validation such as duplicate step IDs, expressions, prompt files, and subflow resolution. Neither command executes workflow steps.
+Linting checks YAML structure, keys, and types. Use `skill-rails check path/to/rails.yaml` for runner-specific validation such as duplicate step IDs, expressions, prompt files, and the resolution of nested rails files. Neither command runs the steps.
 
 ## Folder layout
 
 ```text
 my-skill/
-  SKILL.md        # the short loop: start the flow, do each step, report it
+  SKILL.md        # the short loop: start the run, do each step, report it
   rails.yaml       # the order, the conditions and the inputs of the steps
   scripts/        # the code of the run steps; this folder is in PATH
   prompts/        # the instructions of the agent steps
@@ -58,7 +58,7 @@ When `if` is false, the step is skipped, and `steps.<id>.outcome` is `skipped`.
 
 ### `run`
 
-The runner runs the command with `bash -eo pipefail`, in the working directory of the flow.
+The runner runs the command with `bash -eo pipefail`, in the working directory of the run.
 
 ```yaml
 - id: build
@@ -69,27 +69,28 @@ The runner runs the command with `bash -eo pipefail`, in the working directory o
 ```
 
 - `scripts/` next to `rails.yaml` is first in `PATH`, so `run: build.sh` runs `scripts/build.sh`.
-  Then comes the `scripts/` folder of the plugin that holds the flow: the nearest folder above it with `.claude-plugin/plugin.json` or `.codex-plugin/plugin.json`.
+  Then comes the `scripts/` folder of the plugin that holds the rails file: the nearest folder above it with `.claude-plugin/plugin.json` or `.codex-plugin/plugin.json`.
   The skills of a plugin can so share scripts with no path.
 - A script in `scripts/` needs a shebang (`#!/usr/bin/env bash`, `#!/usr/bin/env node`) and the executable bit (`chmod +x`): then `run: build.mjs` runs it, with no path.
-- `$FLOW_DIR` is the folder of `rails.yaml`, for the other files of the flow.
-- The command writes its outputs to the file `$FLOW_OUTPUT`, as in GitHub Actions: `key=value` lines, or `key<<EOF`, several lines, then `EOF`.
+- `$RAILS_DIR` is the folder of `rails.yaml`, for the other files of the skill.
+- The command writes its outputs to the file `$RAILS_OUTPUT`, as in GitHub Actions: `key=value` lines, or `key<<EOF`, several lines, then `EOF`.
   Later steps read them as `steps.<id>.outputs.<key>`.
 - A `::warning::<text>` line on stdout, or a `WARNING: <text>` line on stderr, becomes a note that the agent shows to the user.
-- A command that fails ends the flow with its last 20 lines of stderr, unless the step has `continue-on-error: true`.
+- A command that fails ends the run with its last 20 lines of stderr, unless the step has `continue-on-error: true`.
   `continue-on-error: [3]` goes on only for these exit codes.
-- `working-directory` runs the command in another folder, relative to the project (or to the `working-directory` of the flow).
+- `working-directory` runs the command in another folder, relative to the project (or to the `working-directory` of the rails file).
   `steps.<id>.outcome` is `success` or `failure`, `steps.<id>.exitCode` is the exit code, and `steps.<id>.error` holds the last lines of stderr of a failed step.
 - `args` adds arguments to the command, each one quoted for bash.
+  It is a list, or one value: `args: ${{ item.dir }}` adds one argument, or each item when the value is a list.
   Its values can be `${{ }}` expressions: a list adds each of its items, and `null`, `false` or an empty string adds nothing, so an optional argument needs no shell code.
   A map adds flags: `--name: true` adds `--name`, a list adds `--name` before each item, another value adds `--name` and the value, and an empty value adds nothing.
 - `env` values can be `${{ }}` expressions.
   A list becomes one line per item, and an object becomes JSON.
 - A `run` command must not hold `${{ }}`: the check refuses it.
   A value can hold shell code (a commit message, a title), so pass every value with `args` or `env`.
-- `stdout` reads the outputs from what the command prints, so that a script needs no `$FLOW_OUTPUT`:
+- `stdout` reads the outputs from what the command prints, so that a script needs no `$RAILS_OUTPUT`:
   - `text` — `steps.<id>.outputs.value` is the text.
-  - `env` — `KEY=value` lines, as in `$FLOW_OUTPUT`.
+  - `env` — `KEY=value` lines, as in `$RAILS_OUTPUT`.
   - `json` — the keys of a JSON object become the outputs; another JSON value is `steps.<id>.outputs.value`.
   - `jsonl` — `steps.<id>.outputs.value` is the list of the JSON lines, also for one line.
 
@@ -138,6 +139,24 @@ The agent follows the instructions, then reports an output.
   A prompt is a file path when it is one word that ends with `.md`, for example `prompts/summary.md`; the check fails when the file is missing.
   Any other text, with spaces or several lines, is the instructions.
   Both can hold `${{ }}` expressions.
+- A relative Markdown link in a prompt, for example `[the guide](../references/guide.md)`, is relative to the prompt file (to `rails.yaml` for inline instructions).
+  The runner makes it absolute, because the agent works in the project folder.
+  `check` reports a link to a missing file.
+  Links in code blocks stay as they are.
+- `with` gives the step named values.
+  The runner fills their `${{ }}` expressions, and adds them as a YAML block after the instructions.
+  Then the prompt file holds only text, and the rails file holds the data paths:
+
+  ```yaml
+  - id: summary
+    prompt: prompts/summary.md
+    with:
+      ticket: ${{ inputs.ticket || 'a free-text task' }}
+      pullRequests: ${{ steps.implement.outputs.pullRequests }}
+  ```
+
+  The agent gets `Write the summary.` and then `Values:` with `ticket: ABC-1` and the list of pull requests.
+  Prefer `with` to long expressions in a prompt file: a renamed step then breaks the rails file, which `check` reads.
 - `output` is a JSON Schema, or its short form.
   The runner validates the reported output and refuses it with the errors when it does not match.
   With no `output`, the agent reports nothing, or any JSON object.
@@ -175,6 +194,8 @@ The agent loads and follows another installed skill through its host’s support
   prompt: Report the number of findings.
   output: { type: object, required: [findings], properties: { findings: { type: integer } } }
 ```
+
+`with` is a text, or a map of named values that the agent gets as YAML arguments.
 
 When the other skill only runs a script, call the script in a `run` step: it costs no model turn.
 
@@ -252,8 +273,8 @@ The runner runs the steps once for each item of a list.
 - The steps of an iteration see the steps before the `foreach`, and the steps of the same iteration.
   Each iteration starts with no results.
 - After the loop, `steps.<id>.outputs.count` is the number of items, and `steps.<id>.outputs.results` is the list of the iterations: `{ item, steps }`.
-- A `stop` inside the loop ends the flow.
-- A `break` step (`break: true`, often with an `if`) ends the loop, and the flow goes on after it.
+- A `stop` inside the loop ends the run.
+- A `break` step (`break: true`, often with an `if`) ends the loop, and the run goes on after it.
   `steps.<id>.outputs.done` is then the number of iterations that ran, and `broken` is true.
 
 ### `repeat`
@@ -290,30 +311,30 @@ The runner runs the steps again and again, until a condition is true: for exampl
 - Each iteration starts with no results, as in a `foreach`.
 - After the loop, `steps.<id>.outputs.last` holds the step results of the last iteration, `count` is the number of iterations, and `results` is the list of the iterations: `{ steps }`.
   `exhausted` is true when the loop ended at `max-iterations` with `until` still false.
-- A `stop` inside the loop ends the flow, and a `break` ends the loop: `broken` is then true.
+- A `stop` inside the loop ends the run, and a `break` ends the loop: `broken` is then true.
 
 ### `uses`
 
-The runner runs another flow as one step.
+The runner runs another rails file as one step.
 
 ```yaml
 - id: ci
-  uses: ../diagnose-ci/rails.yaml   # relative to this flow file
+  uses: ../diagnose-ci/rails.yaml   # relative to this rails file
   with:
     pr: ${{ steps.context.outputs.pr_number }}
   continue-on-error: true
 ```
 
-- The other flow has its own inputs (from `with`), its own steps and its own folder (`flow.dir`, `scripts/`).
+- The other rails file has its own inputs (from `with`), its own steps and its own folder (`rails.dir`, `scripts/`).
 - Its end becomes the outputs of the step: `status` (`done` or `failed`), `message` (its stop message), and `steps` (its step results).
-- When it fails, the flow fails, unless the step has `continue-on-error: true`.
+- When it fails, the run fails, unless the step has `continue-on-error: true`.
   The failure can be a `run` step, a `stop` with `outcome: failure`, or an agent step that the agent reports with `--fail`.
-- `working-directory`: the folder where the other flow runs its commands and its agent steps, relative to the project, for example a PR worktree.
+- `working-directory`: the folder where the other rails file runs its commands and its agent steps, relative to the project, for example a PR worktree.
   An agent step there has `directory` in its report.
-- `forward-stop: true`: a `stop` step of the other flow also ends this flow, with the same message and outcome.
-- `check` loads the other flows too, and refuses flows that use each other.
+- `forward-stop: true`: a `stop` step of the other rails file also ends this one, with the same message and outcome.
+- `check` loads the other rails files too, and refuses rails files that use each other.
 
-#### The flow of another skill
+#### The rails file of another skill
 
 `uses: skill:<plugin>:<skill>` runs the `rails.yaml` of a skill in another plugin, and `uses: skill:<skill>` the one of a standalone skill.
 Use it when the other skill is installed separately, so that no relative path can reach it.
@@ -328,14 +349,14 @@ Use it when the other skill is installed separately, so that no relative path ca
 The runner looks for the skill folder in this order, and uses the first one with a `rails.yaml`:
 
 1. The folders of `SKILL_RAILS_SKILLS_PATH` (separated by `:`): `<dir>/<plugin>/skills/<skill>`, then `<dir>/<skill>`.
-2. A checkout above the flow file: a folder with `.claude-plugin/plugin.json` for this plugin (`skills/<skill>`), or with `.claude-plugin/marketplace.json` that lists the plugin with a relative `source`.
-   In a repository of plugins, the flows and their tests then use the versions of the same commit.
-3. The plugins that Claude Code installed (`installed_plugins.json` in `CLAUDE_CONFIG_DIR` or `~/.claude`), the ones of the marketplace of the flow first.
+2. A checkout above the rails file: a folder with `.claude-plugin/plugin.json` for this plugin (`skills/<skill>`), or with `.claude-plugin/marketplace.json` that lists the plugin with a relative `source`.
+   In a repository of plugins, the rails files and their tests then use the versions of the same commit.
+3. The plugins that Claude Code installed (`installed_plugins.json` in `CLAUDE_CONFIG_DIR` or `~/.claude`), the ones of the marketplace of the rails file first.
 4. For `skill:<skill>`: `.claude/skills`, `.agents/skills` in the working directory, and `~/.claude/skills`.
 
 ### `note`
 
-The runner shows a message to the user (a note in the next report), and the flow goes on.
+The runner shows a message to the user (a note in the next report), and the run goes on.
 An empty message shows nothing.
 
 ```yaml
@@ -356,11 +377,21 @@ The values keep their types: a boolean stays a boolean, and a list stays a list.
     metadata: ${{ inputs.metadata || fromJSON('[]') }}
 ```
 
+`set` can also be one expression that gives an object: each key of the object becomes an output.
+Use it to pick one of several objects, with no shell step:
+
+```yaml
+- id: values
+  set: ${{ (inputs.context && fromJSON(inputs.context)) || steps.found.outputs }}
+```
+
+Any other value of the expression is `steps.<id>.outputs.value`.
+
 Later steps read `steps.target.outputs.site`.
 
 ### `stop`
 
-The runner ends the flow with a message.
+The runner ends the run with a message.
 
 ```yaml
 - if: ${{ !steps.context.outputs.branch }}
@@ -370,8 +401,8 @@ The runner ends the flow with a message.
 
 `fail: <message>` is the short form of a `stop` with `outcome: failure`.
 
-The last step of a flow is usually a `stop` with the result.
-A flow with no more steps ends with `done` and no message.
+The last step of a rails file is usually a `stop` with the result.
+A run with no more steps ends with `done` and no message.
 
 ## Expressions
 
@@ -379,13 +410,13 @@ A flow with no more steps ends with `done` and no message.
 
 | Context | Value |
 |---------|-------|
-| `inputs.<name>` | A flow input. A `list` input is a list: from the CLI, give a JSON list, or one item per line or per comma. |
+| `inputs.<name>` | An input of the rails file. A `list` input is a list: from the CLI, give a JSON list, or one item per line or per comma. |
 | `steps.<id>.outcome` | `success`, `failure` or `skipped`. |
 | `steps.<id>.exitCode`, `steps.<id>.error` | A run step: its exit code, and the last lines of stderr when it failed. |
 | `steps.<id>.outputs.<key>` | An output of a `run` step, or a property of the output of an agent step. |
 | `item`, `loop.index`, `loop.count`, `loop.previous` | Inside a `foreach`: the current item and its place. Inside a `repeat`: the number of the iteration and `max-iterations`. `loop.previous`: the step results of the last iteration. |
 | `env.<NAME>` | An environment variable of the runner. |
-| `flow.dir`, `flow.name` | The folder and the name of the flow. |
+| `rails.dir`, `rails.name` | The folder and the name of the rails file. |
 
 - The functions are the GitHub ones: `contains`, `startsWith`, `endsWith`, `format`, `join`, `toJSON`, `fromJSON`, and these:
   - `length(value)`: the number of items of a list, of keys of an object, or of characters of a text.
@@ -402,9 +433,9 @@ A flow with no more steps ends with `done` and no message.
 
 ## Failure steps
 
-`on-failure` lists steps that run when the flow fails, before the `failed` report, for example to write the reason to a file that a caller reads or to restore a file.
+`on-failure` lists steps that run when the run fails, before the `failed` report, for example to write the reason to a file that a caller reads or to restore a file.
 `failure.message` holds the reason.
-The flow still fails with that reason, also when a failure step fails.
+The run still fails with that reason, also when a failure step fails.
 
 ```yaml
 on-failure:
@@ -414,9 +445,9 @@ on-failure:
       MESSAGE: ${{ failure.message }}
 ```
 
-## Flow outputs
+## Rails outputs
 
-`outputs` gives values back at the end of the flow: an object of expressions, or one expression that gives an object.
+`outputs` gives values back at the end of the run: an object of expressions, or one expression that gives an object.
 
 ```yaml
 outputs: ${{ steps.context.outputs }}   # every output of the step
@@ -435,16 +466,16 @@ The CLI adds `next` to a `step` report, the command that reports it, and `protoc
 | `step` | A step waits for the agent: `id`, `type`, and `instructions`, `skill` and `args`, or `questions`, with `output`. | Does the step, then reports it with `done`. |
 | `step` with `type: wait` | A polling step needs more time. | Reports it with `done` and no output, to keep waiting. |
 | `invalid` | The output does not match: `errors`. | Corrects the output and reports it again. |
-| `done` | The flow ended: `message`, and `outputs` when the flow declares them. | Tells the user the message, and gives the caller the outputs. |
+| `done` | The run ended: `message`, and `outputs` when the rails file declares them. | Tells the user the message, and gives the caller the outputs. |
 | `failed` | A step failed, a `stop` with `outcome: failure`, or a `--fail`: `message`. | Tells the user the message. |
-| `error` | The flow file or a command is not valid: `errors`. | Tells the user the errors. |
+| `error` | The rails file or a command is not valid: `errors`. | Tells the user the errors. |
 
 A result can also have `notes`: the warnings of the run steps and the `note` steps, which the agent shows to the user.
 
 The CLI adds `next` to a `step` result: the exact command that reports the step, with `--cwd`.
-A skill that runs a flow then needs no copy of the commands: the agent runs `next` with its output.
+A skill that runs a rails file then needs no copy of the commands: the agent runs `next` with its output.
 
 CLI commands accept `--cwd <project-directory>`, including `mcp` to bind the server to a project. Paths are relative to this directory. Reports from `start`, `done`, and `status` include `cwd`.
 
-The state is a JSON file per flow name and working directory, in `$SKILL_RAILS_STATE_DIR` (default: the system temp folder).
+The state is a JSON file per rails name and working directory, in `$SKILL_RAILS_STATE_DIR` (default: the system temp folder).
 `start` resets it.

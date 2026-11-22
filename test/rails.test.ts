@@ -1,15 +1,15 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { FlowError, loadFlow, validateFlow } from '../src/flow.js';
+import { RailsError, loadRails, validateRails } from '../src/rails.js';
 import { tempDir } from './helpers.js';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
-const errorsOf = (flow: unknown) => validateFlow(flow);
+const errorsOf = (rails: unknown) => validateRails(rails);
 
-describe('validateFlow', () => {
+describe('validateRails', () => {
   it('accepts the examples', () => {
-    for (const name of ['hello', 'open-pr']) expect(() => loadFlow(path.join(root, 'examples', name, 'rails.yaml'))).not.toThrow();
+    for (const name of ['hello', 'open-pr']) expect(() => loadRails(path.join(root, 'examples', name, 'rails.yaml'))).not.toThrow();
   });
 
   it('refuses ${{ }} in a run command, with one error for that step type', () => {
@@ -39,26 +39,26 @@ describe('validateFlow', () => {
   });
 });
 
-describe('loadFlow', () => {
-  it('reads a prompt file next to the flow', () => {
+describe('loadRails', () => {
+  it('reads a prompt file next to the rails file', () => {
     const dir = tempDir({ 'rails.yaml': 'name: x\nsteps:\n  - id: a\n    prompt: prompts/a.md\n', 'prompts/a.md': 'Do ${{ inputs.x }}.\n' });
-    expect((loadFlow(path.join(dir, 'rails.yaml')).steps[0] as { prompt?: string }).prompt).toBe('Do ${{ inputs.x }}.\n');
+    expect((loadRails(path.join(dir, 'rails.yaml')).steps[0] as { prompt?: string }).prompt).toBe('Do ${{ inputs.x }}.\n');
   });
 
   it('keeps a prompt with spaces or several lines as the instructions', () => {
     const dir = tempDir({ 'rails.yaml': "name: x\nsteps:\n  - id: a\n    prompt: Read notes.md\n  - id: b\n    prompt: |\n      a.md\n      b.md\n", 'notes.md': 'never read' });
-    const steps = loadFlow(path.join(dir, 'rails.yaml')).steps as Array<{ prompt?: string }>;
+    const steps = loadRails(path.join(dir, 'rails.yaml')).steps as Array<{ prompt?: string }>;
     expect(steps.map((step) => step.prompt)).toEqual(['Read notes.md', 'a.md\nb.md\n']);
   });
 
   it('reports a missing prompt file and a bad expression', () => {
     const dir = tempDir({ 'rails.yaml': 'name: x\nsteps:\n  - id: a\n    prompt: prompts/none.md\n  - if: nope.x\n    stop: s\n' });
     try {
-      loadFlow(path.join(dir, 'rails.yaml'));
+      loadRails(path.join(dir, 'rails.yaml'));
       expect.unreachable();
     } catch (error) {
-      expect(error).toBeInstanceOf(FlowError);
-      expect((error as FlowError).errors.join('\n')).toMatch(/cannot read prompts\/none.md[\s\S]*nope/);
+      expect(error).toBeInstanceOf(RailsError);
+      expect((error as RailsError).errors.join('\n')).toMatch(/cannot read prompts\/none.md[\s\S]*nope/);
     }
   });
 });

@@ -3,4 +3,4 @@
 set -eo pipefail
 args=(--title "$TITLE" --base "$BASE" --body-file "$BODY")
 if [ "$DRAFT" = true ]; then args+=(--draft); fi
-echo "url=$(gh pr create "${args[@]}" | tail -n 1)" >> "$FLOW_OUTPUT"
+echo "url=$(gh pr create "${args[@]}" | tail -n 1)" >> "$RAILS_OUTPUT"

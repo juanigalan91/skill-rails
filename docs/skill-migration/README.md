@@ -4,7 +4,7 @@ The create and migrate skills run `rails.yaml` in their existing folders, preser
 
 ## Design
 
-| Workflow | Step | Responsibility |
+| Skill | Step | Responsibility |
 |---|---|---|
 | Create | plan (prompt) | Resolve requirements, classify and optimize steps, show the design when interactive |
 | Create | scaffold (run) | Create a fresh skill and wrapper, or ensure directories exist for an in-place migration |
@@ -29,7 +29,7 @@ Creation takes three agent steps normally (plan, author, smoke), plus one repair
 | Reduce handoffs, collect context, reference fixed rules, check edits | plan.md and audit.md |
 | Create the wrapper template for new skills; keep the existing wrapper readable until migration authoring | scaffold.mjs |
 | Keep order/conditions/inputs in rails.yaml, scripts and prompts in their directories | author.md |
-| Bash shebang, pipefail, executable mode, FLOW_OUTPUT, warning notes | author.md |
+| Bash shebang, pipefail, executable mode, RAILS_OUTPUT, warning notes | author.md |
 | Pass expression values via env, never interpolate run commands | author.md and the format validator |
 | Ask options have labels/descriptions; output schemas contain needed values | author.md |
 | Validate, repair, and exercise a safe fixture before real use | check, fix/recheck, failure stop, smoke |
@@ -37,18 +37,18 @@ Creation takes three agent steps normally (plan, author, smoke), plus one repair
 | Report files, step table, code/agent counts, and behavioral differences | smoke.md and its output schema |
 | Read every loaded file, script, and invoked skill before replacing instructions | audit.md and plan.md |
 | Map every rule and gate to the migrated implementation | audit output schema; mapping stays in runner state and the final report |
-| Reuse the creation skill's file rules | uses subflow |
+| Reuse the creation skill's file rules | uses a nested rails file |
 
-Migration now overwrites the existing skill directly, as requested. It does not retain an original directory, create a -flow sibling, generate RULES.md, or run a before/after comparison requiring preserved copies. Scaffolding never overwrites an unrelated existing creation target and verifies that a migration's source and target resolve to the same directory. The agent updates migration files in place and preserves unrelated files and useful scripts/tests.
+Migration now overwrites the existing skill directly, as requested. It does not retain an original directory, create a -rails sibling, generate RULES.md, or run a before/after comparison requiring preserved copies. Scaffolding never overwrites an unrelated existing creation target and verifies that a migration's source and target resolve to the same directory. The agent updates migration files in place and preserves unrelated files and useful scripts/tests.
 
 There is one bounded repair pass. Unresolved errors stop with diagnostics and leave current edits in place for inspection and manual repair; no backup restoration occurs. Tests and smoke runs still use disposable execution environments for safety, without producing retained migration backups.
 
 ## Why the runner remains Markdown
 
-`run-skill-rails` is the bootstrap protocol: start a flow, perform a pending step, submit output, handle errors/questions/polling. Wrapping that protocol in another flow would still require an outer copy and could recurse. It remains a small Markdown adapter, as do the generated SKILL.md wrappers and judgment prompts.
+`run-skill-rails` is the bootstrap protocol: start a run, perform a pending step, submit output, handle errors/questions/polling. Wrapping that protocol in another rails file would still require an outer copy and could recurse. It remains a small Markdown adapter, as do the generated SKILL.md wrappers and judgment prompts.
 
 ## Evidence and limits
 
-Run `yarn test` or, after building, `node bin/skill-rails.js test skills`. Scenarios exercise creation, repair, failure gates, existing destinations, literal metacharacters in paths, in-place updates, absent backups, unchanged supporting files, and failed subflows. The npx stub routes runner invocations to this checkout without registry calls.
+Run `yarn test` or, after building, `node bin/skill-rails.js test skills`. Scenarios exercise creation, repair, failure gates, existing destinations, literal metacharacters in paths, in-place updates, absent backups, unchanged supporting files, and failed nested rails files. The npx stub routes runner invocations to this checkout without registry calls.
 
-These tests verify control flow and artifacts, not semantic compliance by a real model. No paid live benchmark was run, and no speed or cost improvement is claimed.
+These tests verify the step order and the artifacts, not semantic compliance by a real model. No paid live benchmark was run, and no speed or cost improvement is claimed.

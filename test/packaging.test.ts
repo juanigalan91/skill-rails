@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, it } from 'vitest';
+import { HOOKS_CONFIG } from '../src/hook.js';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const read = (file: string) => JSON.parse(fs.readFileSync(path.join(root, file), 'utf8'));
@@ -22,6 +23,14 @@ it('ships discoverable Codex and portable plugins with their shared resources', 
       expect(manifest.name).toBe(pkg.name);
       expect(manifest.version).toBe(pkg.version);
     }
+    expect(read('.claude-plugin/marketplace.json').plugins[0].version).toBe(pkg.version);
+    const range = pkg.version.split('.').slice(0, 2).join('.');
+    expect(read('hooks/hooks.json')).toEqual(HOOKS_CONFIG(`npx -y skill-rails@${range}`));
+    expect(files.has('hooks/hooks.json')).toBe(true);
+    expect(files.has('schema/rails.schema.json')).toBe(true);
+    expect(files.has('dist/rails.js')).toBe(true);
+    expect(files.has('dist/flow.js')).toBe(false);
+    expect(files.has('schema/flow.schema.json')).toBe(false);
     const marketplace = read('.agents/plugins/marketplace.json');
     const entry = marketplace.plugins.find((plugin: { name: string }) => plugin.name === pkg.name);
     expect(path.resolve(root, entry.source.path)).toBe(path.resolve(root));
@@ -47,6 +56,7 @@ it('ships discoverable Codex and portable plugins with their shared resources', 
       const { type, ...launch } = server as { type: string; command: string; args: string[] };
       expect(type).toBe('stdio');
       expect(launch).toEqual(legacyServers[name]);
+      expect(launch.args).toContain(`skill-rails@${range}`);
     }
   } finally {
     fs.rmSync(cache, { recursive: true, force: true });

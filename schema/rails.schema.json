@@ -1,8 +1,8 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://raw.githubusercontent.com/juanigalan91/skill-rails/main/schema/flow.schema.json",
-  "title": "skill-rails flow",
-  "description": "A deterministic flow for an AI agent skill. The runner does the run and stop steps; the agent does the skill, prompt and ask steps, one at a time.",
+  "$id": "https://raw.githubusercontent.com/juanigalan91/skill-rails/main/schema/rails.schema.json",
+  "title": "skill-rails rails file",
+  "description": "A rails file: the deterministic steps of an AI agent skill. The runner does the run and stop steps; the agent does the skill, prompt and ask steps, one at a time.",
   "type": "object",
   "required": [
     "name",
@@ -12,7 +12,7 @@
   "properties": {
     "name": {
       "$ref": "#/definitions/id",
-      "description": "The flow name. The state file and the done command use it."
+      "description": "The rails name. The state file and the done command use it."
     },
     "description": {
       "type": "string"
@@ -75,7 +75,7 @@
         "object",
         "string"
       ],
-      "description": "The values that the flow gives back at its end, in the done report and as the outputs of a uses step: an object of ${{ }} expressions, or one expression that gives an object."
+      "description": "The values that the rails file gives back at its end, in the done report and as the outputs of a uses step: an object of ${{ }} expressions, or one expression that gives an object."
     },
     "on-failure": {
       "type": "array",
@@ -83,7 +83,7 @@
       "items": {
         "$ref": "#/definitions/step"
       },
-      "description": "Steps that run when the flow fails, before the failed report: failure.message holds the reason. The flow still fails."
+      "description": "Steps that run when the run fails, before the failed report: failure.message holds the reason. The run still fails."
     }
   },
   "definitions": {
@@ -144,7 +144,7 @@
     },
     "runStep": {
       "type": "object",
-      "description": "A shell step that the runner runs with bash. It writes outputs to $FLOW_OUTPUT.",
+      "description": "A shell step that the runner runs with bash. It writes outputs to $RAILS_OUTPUT.",
       "required": [
         "run"
       ],
@@ -161,11 +161,15 @@
           "not": {
             "pattern": "\\$\\{\\{"
           },
-          "description": "Bash. Pass values with args or env: a ${{ }} in the command is a shell injection. The scripts/ folder next to the flow, then the scripts/ folder of its plugin, are in PATH."
+          "description": "Bash. Pass values with args or env: a ${{ }} in the command is a shell injection. The scripts/ folder next to the rails file, then the scripts/ folder of its plugin, are in PATH."
         },
         "args": {
-          "type": "array",
-          "description": "Arguments added to the command, each one quoted for bash. Values can be ${{ }} expressions; a list adds each of its items, and null, false or an empty string adds nothing. A map adds flags: { --name: value } adds the flag alone for true, the flag before each item for a list, the flag and the value for another value, and nothing for an empty value."
+          "type": [
+            "array",
+            "string",
+            "object"
+          ],
+          "description": "Arguments added to the command, each one quoted for bash: a list, or one value (args: ${{ item.dir }}). Values can be ${{ }} expressions; a list adds each of its items, and null, false or an empty string adds nothing. A map adds flags: { --name: value } adds the flag alone for true, the flag before each item for a list, the flag and the value for another value, and nothing for an empty value."
         },
         "env": {
           "type": "object",
@@ -211,7 +215,7 @@
         },
         "working-directory": {
           "type": "string",
-          "description": "The folder where the command (or the other flow) runs, relative to the project. Can be a ${{ }} expression."
+          "description": "The folder where the command (or the other rails file) runs, relative to the project. Can be a ${{ }} expression."
         }
       }
     },
@@ -234,12 +238,15 @@
           "type": "string"
         },
         "with": {
-          "type": "string",
-          "description": "The arguments of the skill."
+          "type": [
+            "string",
+            "object"
+          ],
+          "description": "The arguments of the skill: a text, or a map of named values that the agent gets as YAML. Their ${{ }} expressions are filled."
         },
         "prompt": {
           "type": "string",
-          "description": "The instructions, or the path of a Markdown file with them, relative to the flow file: a single word that ends with .md. Their ${{ }} expressions are filled."
+          "description": "The instructions, or the path of a Markdown file with them, relative to the rails file: a single word that ends with .md. Their ${{ }} expressions are filled."
         },
         "output": {
           "type": "object",
@@ -272,7 +279,11 @@
         },
         "prompt": {
           "type": "string",
-          "description": "The instructions, or the path of a Markdown file with them, relative to the flow file: a single word that ends with .md. Their ${{ }} expressions are filled."
+          "description": "The instructions, or the path of a Markdown file with them, relative to the rails file: a single word that ends with .md. Their ${{ }} expressions are filled."
+        },
+        "with": {
+          "type": "object",
+          "description": "Named values that the agent gets as a YAML block after the instructions. Their ${{ }} expressions are filled."
         },
         "output": {
           "type": "object",
@@ -335,7 +346,7 @@
     },
     "stopStep": {
       "type": "object",
-      "description": "The runner ends the flow with a message.",
+      "description": "The runner ends the run with a message.",
       "required": [
         "stop"
       ],
@@ -478,7 +489,7 @@
     },
     "usesStep": {
       "type": "object",
-      "description": "Runs another flow as one step. Its stop message and status become the outputs of this step.",
+      "description": "Runs another rails file as one step. Its stop message and status become the outputs of this step.",
       "required": [
         "id",
         "uses"
@@ -493,23 +504,23 @@
         },
         "uses": {
           "type": "string",
-          "description": "The flow file, relative to this flow file, or the flow of another skill: skill:<plugin>:<skill> or skill:<skill>."
+          "description": "The rails file, relative to this rails file, or the rails file of another skill: skill:<plugin>:<skill> or skill:<skill>."
         },
         "with": {
           "type": "object",
-          "description": "The inputs of the other flow. Values can be ${{ }} expressions."
+          "description": "The inputs of the other rails file. Values can be ${{ }} expressions."
         },
         "continue-on-error": {
           "type": "boolean",
-          "description": "Go on when the other flow fails."
+          "description": "Go on when the other rails file fails."
         },
         "forward-stop": {
           "type": "boolean",
-          "description": "A stop step of the other flow also ends this flow, with the same message and outcome."
+          "description": "A stop step of the other rails file also ends this one, with the same message and outcome."
         },
         "working-directory": {
           "type": "string",
-          "description": "The folder where the other flow runs its commands and agent steps, relative to the project. Can be a ${{ }} expression."
+          "description": "The folder where the other rails file runs its commands and agent steps, relative to the project. Can be a ${{ }} expression."
         }
       }
     },
@@ -558,7 +569,7 @@
     },
     "breakStep": {
       "type": "object",
-      "description": "Ends the innermost foreach or repeat. The flow goes on after it.",
+      "description": "Ends the innermost foreach or repeat. The run goes on after it.",
       "required": [
         "break"
       ],
@@ -577,7 +588,7 @@
     },
     "noteStep": {
       "type": "object",
-      "description": "Shows a message to the user (a note in the next report), and the flow goes on. An empty message shows nothing.",
+      "description": "Shows a message to the user (a note in the next report), and the run goes on. An empty message shows nothing.",
       "required": [
         "note"
       ],
@@ -610,14 +621,23 @@
           "$ref": "#/definitions/if"
         },
         "set": {
-          "type": "object",
-          "minProperties": 1
+          "oneOf": [
+            {
+              "type": "object",
+              "minProperties": 1
+            },
+            {
+              "type": "string",
+              "pattern": "^\\s*\\$\\{\\{[\\s\\S]*\\}\\}\\s*$",
+              "description": "An expression that gives an object: each key becomes an output."
+            }
+          ]
         }
       }
     },
     "failStep": {
       "type": "object",
-      "description": "The runner ends the flow as failed, with a message: a short form of stop with outcome failure.",
+      "description": "The runner ends the run as failed, with a message: a short form of stop with outcome failure.",
       "required": [
         "fail"
       ],

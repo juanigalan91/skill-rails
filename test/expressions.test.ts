@@ -6,7 +6,7 @@ const context: Context = {
   inputs: { auto: false, who: 'team' },
   steps: { list: { outcome: 'success', outputs: { items: ['a', 'b'], empty: [] } }, skipped: { outcome: 'skipped' } },
   env: {},
-  flow: { name: 'test', dir: '/tmp' },
+  rails: { name: 'test', dir: '/tmp' },
   item: null,
   failure: null,
   loop: null,

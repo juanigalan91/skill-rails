@@ -17,5 +17,5 @@ done
   echo 'commits<<EOF'; git log "$merge_base..HEAD" --oneline; echo EOF
   echo 'files<<EOF'; git diff "$merge_base..HEAD" --name-only; echo EOF
   echo 'recent<<EOF'; git log "origin/$base" --oneline -10 2>/dev/null || true; echo EOF
-} >> "$FLOW_OUTPUT"
+} >> "$RAILS_OUTPUT"
 if [ -n "$(git status --short)" ]; then echo "::warning::The uncommitted changes are not part of the PR."; fi

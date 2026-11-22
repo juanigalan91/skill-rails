@@ -18,7 +18,7 @@ function cli(args: string[], { cwd, input }: { cwd: string; input?: string }) {
 }
 
 describe('the CLI', () => {
-  it('runs a flow with --input and an output on stdin', () => {
+  it('runs a rails file with --input and an output on stdin', () => {
     const dir = tempDir({
       'rails.yaml': "name: cli\ninputs:\n  n: { type: number }\nsteps:\n  - id: a\n    prompt: Give ${{ inputs.n }}.\n    output: { type: object, required: [v], properties: { v: { type: number } } }\n  - stop: '${{ steps.a.outputs.v }}'\n",
     });
@@ -47,7 +47,7 @@ describe('the CLI', () => {
   });
 
   it('runs in INIT_CWD, the folder where npx was started', () => {
-    const dir = tempDir({ 'sub/rails.yaml': "name: here\nsteps:\n  - id: w\n    run: echo \"dir=$(basename \"$PWD\")\" >> \"$FLOW_OUTPUT\"\n  - stop: '${{ steps.w.outputs.dir }}'\n" });
+    const dir = tempDir({ 'sub/rails.yaml': "name: here\nsteps:\n  - id: w\n    run: echo \"dir=$(basename \"$PWD\")\" >> \"$RAILS_OUTPUT\"\n  - stop: '${{ steps.w.outputs.dir }}'\n" });
     const result = spawnSync(process.execPath, [bin, 'start', 'rails.yaml'], {
       cwd: dir,
       encoding: 'utf8',

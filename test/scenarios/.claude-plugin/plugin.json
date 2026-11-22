@@ -1,1 +1,1 @@
-{ "name": "demo-plugin", "version": "0.0.0", "description": "Scenario flows for the skill-rails tests." }
+{ "name": "demo-plugin", "version": "0.0.0", "description": "Scenario skills for the skill-rails tests." }

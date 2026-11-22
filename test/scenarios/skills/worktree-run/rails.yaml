@@ -1,5 +1,5 @@
 name: worktree-run
-description: Run a skill of the plugin in another folder, and pass on the stop of a sub-flow.
+description: Run a skill of the plugin in another folder, and pass on the stop of a nested rails file.
 inputs:
   dir: { default: work }
 steps:

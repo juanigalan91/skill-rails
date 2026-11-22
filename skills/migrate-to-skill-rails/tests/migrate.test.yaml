@@ -1,4 +1,4 @@
-flow: ../rails.yaml
+rails: ../rails.yaml
 git: false
 path:
   - ../../create-skill-rails/tests/stubs
@@ -46,7 +46,7 @@ tests:
             steps:
               - stop: migrated safely
           skill/tests/sample.test.yaml: |
-            flow: ../rails.yaml
+            rails: ../rails.yaml
             git: false
             expect:
               status: done
@@ -74,7 +74,7 @@ tests:
           name: sample
           steps:
             - stop: migrated safely
-        skill-flow: absent
+        skill-rails: absent
         skill/SKILL.md.bak: absent
         skill/SKILL.original.md: absent
         skill/backup: absent
@@ -115,7 +115,7 @@ tests:
             steps:
               - stop: migrated safely
           skill/tests/sample.test.yaml: |
-            flow: ../rails.yaml
+            rails: ../rails.yaml
             git: false
             expect:
               status: done
@@ -136,7 +136,7 @@ tests:
           description: A migrated skill.
           ---
           Run rails.yaml with run-skill-rails.
-        skill-flow: absent
+        skill-rails: absent
         skill/SKILL.md.bak: absent
         skill/SKILL.original.md: absent
         skill/backup: absent
@@ -173,7 +173,7 @@ tests:
             steps:
               - stop: migrated safely
           skill/tests/sample.test.yaml: |
-            flow: ../rails.yaml
+            rails: ../rails.yaml
             git: false
             expect:
               status: done
@@ -194,7 +194,7 @@ tests:
           description: A migrated skill.
           ---
           Run rails.yaml with run-skill-rails.
-        skill-flow: absent
+        skill-rails: absent
         skill/SKILL.md.bak: absent
         skill/SKILL.original.md: absent
         skill/backup: absent
@@ -214,7 +214,7 @@ tests:
           description: A sample skill.
           ---
           Report migrated safely.
-        skill-flow: absent
+        skill-rails: absent
         skill/SKILL.md.bak: absent
         skill/SKILL.original.md: absent
         skill/backup: absent
@@ -249,7 +249,7 @@ tests:
           description: A sample skill.
           ---
           Report migrated safely.
-        skill-flow: absent
+        skill-rails: absent
         skill/SKILL.md.bak: absent
         skill/SKILL.original.md: absent
         skill/backup: absent
@@ -292,7 +292,7 @@ tests:
             steps:
               - stop: migrated safely
           skill/tests/sample.test.yaml: |
-            flow: ../rails.yaml
+            rails: ../rails.yaml
             git: false
             expect:
               status: done
@@ -313,7 +313,7 @@ tests:
           description: A migrated skill.
           ---
           Run rails.yaml with run-skill-rails.
-        skill-flow: absent
+        skill-rails: absent
         skill/SKILL.md.bak: absent
         skill/SKILL.original.md: absent
         skill/backup: absent
@@ -356,7 +356,7 @@ tests:
           description: A migrated skill.
           ---
           Run rails.yaml with run-skill-rails.
-        skill-flow: absent
+        skill-rails: absent
         skill/SKILL.md.bak: absent
         skill/SKILL.original.md: absent
         skill/backup: absent
@@ -374,7 +374,7 @@ tests:
       steps:
         assess: not reached
       files:
-        skill-flow: absent
+        skill-rails: absent
         skill/SKILL.md.bak: absent
         skill/SKILL.original.md: absent
         skill/backup: absent
@@ -387,7 +387,7 @@ tests:
       steps:
         assess: not reached
       files:
-        skill-flow: absent
+        skill-rails: absent
         skill/SKILL.md.bak: absent
         skill/SKILL.original.md: absent
         skill/backup: absent
