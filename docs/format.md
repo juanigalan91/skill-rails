@@ -1,6 +1,6 @@
 # The rails file format
 
-A rails file (`rails.yaml`) is a YAML file, checked against [`schema/rails.schema.json`](../schema/rails.schema.json).
+A rails file (`rails.yaml`) is a YAML file, or a TypeScript file (`rails.ts`, see [TypeScript rails files](#typescript-rails-files)). The YAML file is checked against [`schema/rails.schema.json`](../schema/rails.schema.json).
 The runner goes through its steps in order.
 It runs the `run` and `stop` steps itself, and it gives the `skill`, `prompt` and `ask` steps to the agent, one at a time.
 
@@ -40,12 +40,61 @@ Install the recommended **YAML** (Red Hat) and **ESLint** extensions in VS Code 
 
 Linting checks YAML structure, keys, and types. Use `skill-rails check path/to/rails.yaml` for runner-specific validation such as duplicate step IDs, expressions, prompt files, and the resolution of nested rails files. Neither command runs the steps.
 
+## TypeScript rails files
+
+A rails file can also be `rails.ts`: the steps are code, with types.
+The agent gets the same steps and the same reports as with YAML.
+
+```ts
+import { defineRails } from 'skill-rails';
+
+export default defineRails({
+  name: 'fix-branch',
+  inputs: { target: { type: 'string', default: 'main' } },
+  run({ inputs, sh, prompt, ask, note }) {
+    const branch = sh`git rev-parse --abbrev-ref ${inputs.target}`;
+    const decision = prompt('decide', 'prompts/decide.md', {
+      with: { branch },
+      output: { kind: 'fix | skip', note: 'string' },
+    });
+    if (decision.kind === 'skip') return `skipped ${branch}`;
+    const files = decision.note.split(',').map((part, i) => prompt(`fix-${i}`, `Fix ${part}.`, { output: { file: 'string' } }).file);
+    note(`fixed ${files.join(', ')}`);
+    if (ask('push', { question: 'Push the branch?', options: ['Yes', 'No'] }) === 'No') return 'not pushed';
+    return { message: `pushed ${branch}`, outputs: { files } };
+  },
+});
+```
+
+- `sh` runs a command and gives its trimmed stdout. In a tagged template (`` sh`git log ${ref}` ``), each value is quoted, so it cannot inject shell code; a map value adds flags, as in `args`. `sh.json` parses the stdout, `sh.env` reads `KEY=value` lines, and `sh.with({ id, cwd, env })` names the step, so that a prompt file can read `${{ steps.<id>.outputs }}`, or sets the folder or the environment. The `scripts/` folders are in `PATH`, as for a `run` step.
+- `prompt(id, instructions, { with, output, directory })` and `skill(id, name, { args, prompt, output })` are agent steps. The instructions are a text, or the path of a Markdown file relative to `rails.ts`. The type of the result comes from the short output form: `kind: 'fix | skip'` gives `'fix' | 'skip'`.
+- `ask(id, { question, options, multiSelect, header })` asks the user one question and gives the `value` of the chosen option, else its label. `ask(id, { review: {...}, checks: {...} })` asks several questions in one step and gives the answers by key; a question that is `false` or `undefined` is not asked.
+- `uses(id, rails, inputs)` runs another rails file, YAML or TypeScript (`skill:<plugin>:<skill>`, or a path relative to `rails.ts`), and gives its outputs. Its agent steps get the id `<uses id>/<step id>`, as in YAML.
+- `note(message)` shows a message to the user.
+- `run` returns the message of the end, `{ message, outputs }`, or `{ fail: message }`. An uncaught error fails the run with its message.
+- A failed command or an agent `--fail` throws a `StepError` in `run`: catch it to go on, as with `continue-on-error`.
+- The inputs are checked as in YAML, and their types come from `type`.
+
+**Replay.** Each `start` and `done` call runs `run` again from the start.
+A step that has a result returns it at once, and a command does not run again.
+The first agent step with no result is the step that the agent gets, and the call stops there.
+Thus `run` must be deterministic: read no clock, random value or file outside `sh`, so that each replay takes the same path.
+The runner saves the order of the step ids, and fails the run when a replay asks for another step at the same place.
+
+- The replay matches the steps by their position, so an id can repeat in a loop: `steps.<id>` is its last result, and a test gives a list of answers, as for a YAML `repeat`.
+- A `sh` step with no id gets `sh-<call number>`.
+- The tests use the same `*.test.yaml` files, with `rails: ../rails.ts`; the answers are keyed by the agent step ids, and the answer of a one-question `ask` is `{ answer: <label> }`. A step that the code does not call is `not reached`, and an expected `skipped` also matches it.
+- `check` loads the file and checks its name and inputs. It cannot list the steps: they exist only when the code runs.
+- Loading `rails.ts` runs its code, also in `check`. Do not check a file that you do not trust.
+- A YAML `uses` step cannot run a `rails.ts`: call it from another `rails.ts`, or call the skill with a `skill` step.
+- The runner loads the file with [jiti](https://github.com/unjs/jiti), with no build step. `import { defineRails } from 'skill-rails'` works in an installed skill with no `node_modules`; install `skill-rails` as a dev dependency to get the types in your editor.
+
 ## Folder layout
 
 ```text
 my-skill/
   SKILL.md        # the short loop: start the run, do each step, report it
-  rails.yaml       # the order, the conditions and the inputs of the steps
+  rails.yaml       # the order, the conditions and the inputs of the steps (or rails.ts: the steps as code)
   scripts/        # the code of the run steps; this folder is in PATH
   prompts/        # the instructions of the agent steps
 ```

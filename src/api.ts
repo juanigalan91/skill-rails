@@ -1,16 +1,22 @@
 // The commands that the CLI and the MCP server share. Each one returns the JSON report for the agent.
 import path from 'node:path';
+import { advanceRun, failCode, submitCode } from './code.js';
 import { advance, failPending, finish, newState, report, rootResults, submit } from './engine.js';
 import { loadRails } from './rails.js';
 import { readState, removeState, writeState } from './state.js';
 import type { Exec, Report, State, StepResult } from './types.js';
 
 export { loadRails, validateRails, RailsError } from './rails.js';
+export { defineRails } from './define.js';
+export type { RailsDefinition, RailsContext, Output, Sh } from './define.js';
+export { StepError } from './code.js';
 export { advance, newState, submit, report } from './engine.js';
 export type * from './types.js';
 export { runTests, runTest, loadTests, findTests, commandAgent } from './testing.js';
 export type { TestCase, TestResult, TestOptions, Agent } from './testing.js';
 export { record, trace } from './record.js';
+export { bench, summary, agentMetrics } from './bench.js';
+export type { BenchFile, BenchRow, BenchVariant } from './bench.js';
 export type { TraceLine } from './record.js';
 
 interface CommonOptions {
@@ -23,6 +29,8 @@ const errorReport = (error: unknown): Report => ({
   errors: (error as { errors?: string[] }).errors ?? [(error as Error).message],
 });
 
+const run = advanceRun;
+
 function save(state: State): Report {
   const result = { ...report(state), cwd: state.cwd };
   writeState(state);
@@ -33,7 +41,7 @@ function save(state: State): Report {
 export function start({ file, inputs = {}, cwd = process.cwd(), exec }: { file: string; inputs?: Record<string, unknown> } & CommonOptions): Report {
   try {
     const state = { ...newState(loadRails(file, { cwd }), inputs, cwd), file: path.resolve(file) };
-    advance(state, { exec });
+    run(state, exec);
     return save(state);
   } catch (error) {
     return errorReport(error);
@@ -52,14 +60,14 @@ export function done({
   try {
     const state = readState(rails, cwd);
     if (fail !== undefined) {
-      const errors = failPending(state, id, fail);
+      const errors = state.rails.code ? failCode(state, id, fail) : failPending(state, id, fail);
       if (errors.length) return { status: 'invalid', id, errors };
-      advance(state, { exec });
+      run(state, exec);
       return save(state);
     }
-    const errors = submit(state, id, output);
+    const errors = state.rails.code ? submitCode(state, id, output) : submit(state, id, output);
     if (errors.length) return { status: 'invalid', id, errors, output: state.pending?.output };
-    advance(state, { exec });
+    run(state, exec);
     return save(state);
   } catch (error) {
     return errorReport(error);
@@ -86,7 +94,7 @@ export function reset({ rails, cwd = process.cwd() }: { rails: string; cwd?: str
 export function check({ file, cwd = process.cwd() }: { file: string; cwd?: string }): Report {
   try {
     const rails = loadRails(file, { cwd });
-    return { status: 'ok', rails: rails.name, steps: rails.steps.length };
+    return { status: 'ok', rails: rails.name, ...(rails.code ? {} : { steps: rails.steps.length }) };
   } catch (error) {
     return errorReport(error);
   }

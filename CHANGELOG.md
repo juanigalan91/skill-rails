@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.0
+
+- Add TypeScript and JavaScript rails files with `defineRails`, typed inputs and outputs, shell helpers, prompts, skills, conditional questions, and nested YAML or TypeScript runs.
+- Replay code-based runs using saved step results, with failure handling, recording, tracing, and fixed-answer tests. Empty conditional question groups are skipped.
+- Add `skill-rails bench` and the benchmark API to compare variants through repeated fixed-answer or live agent runs, with median summaries, CSV export, optional transcripts, and agent usage metrics.
+- Add `SKILL_RAILS_COMMAND` to select the command used in generated CLI continuation reports.
+- Keep the README focused on advantages and the open-PR example; preserve the walkthrough, architecture, CLI/API reference, tradeoffs, and benchmarks in dedicated documentation.
+
 ## 0.4.0
 
 - `set` takes one expression that gives an object: each key becomes an output.

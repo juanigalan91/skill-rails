@@ -1,8 +1,10 @@
-// Loads a rails file: YAML, schema check, prompt files, nested rails files, step ids and expressions.
+// Loads a rails file: YAML or TypeScript, schema check, prompt files, nested rails files, step ids and expressions.
 import { outputSchema } from './compact.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import yaml from 'js-yaml';
+import { createJiti } from 'jiti';
+import { fileURLToPath } from 'node:url';
 import type { ValidateFunction } from 'ajv';
 import { ajv, checkOutputSchema, formatErrors, schema } from './schema.js';
 import { parse, sourcesOf } from './expressions.js';
@@ -146,6 +148,7 @@ function prepareSteps(steps: Step[], dir: string, errors: string[], loading: str
       try {
         const file = uses.uses.startsWith('skill:') ? resolveSkillRails(uses.uses.slice('skill:'.length), dir, { cwd }) : path.resolve(dir, uses.uses);
         uses.rails = loadFile(file, loading, cwd);
+        if (uses.rails.code) errors.push(`step "${uses.id}": a YAML uses step cannot run a TypeScript rails file; call it from rails.ts, or call the skill with a skill step`);
       } catch (error) {
         const inner = (error as RailsError).errors ?? [(error as Error).message];
         errors.push(...inner.map((line) => `step "${uses.id}" (${uses.uses}): ${line}`));
@@ -154,10 +157,40 @@ function prepareSteps(steps: Step[], dir: string, errors: string[], loading: str
   }
 }
 
+const CODE_FILE = /\.(ts|mts|js|mjs)$/;
+const here = path.dirname(fileURLToPath(import.meta.url));
+// A rails.ts in an installed skill has no node_modules: its skill-rails import resolves to this package.
+const define = path.join(here, fs.existsSync(path.join(here, 'define.ts')) ? 'define.ts' : 'define.js');
+
+/** The default export of a TypeScript or JavaScript rails file. Loading it runs its code. */
+export function loadCode(file: string): unknown {
+  const jiti = createJiti(import.meta.url, { moduleCache: false, fsCache: false, alias: { 'skill-rails': define } });
+  const module = jiti(file) as { default?: unknown };
+  return module.default ?? module;
+}
+
+/** A TypeScript rails file: its name and inputs are checked as in YAML; its steps are the code of run. */
+function codeRails(file: string): Rails {
+  const definition = loadCode(file) as { name?: unknown; description?: unknown; inputs?: unknown; run?: unknown };
+  if (typeof definition?.run !== 'function') throw new RailsError([`${file} must export default defineRails({ name, inputs, run })`]);
+  const { name, description, inputs } = definition;
+  const errors = validateRails({ name, ...(description === undefined ? {} : { description }), ...(inputs === undefined ? {} : { inputs }), steps: [{ stop: 'code' }] });
+  if (errors.length) throw new RailsError(errors);
+  return { name: name as string, inputs: (inputs ?? {}) as Rails['inputs'], steps: [], dir: path.dirname(file), code: file, ...(description ? { description: description as string } : {}) };
+}
+
 function loadFile(file: string, loading: string[], cwd: string): Rails {
   const resolved = path.resolve(file);
   if (loading.includes(resolved)) {
     throw new RailsError([`the rails files use each other: ${[...loading, resolved].map((f) => path.basename(path.dirname(f)) + '/' + path.basename(f)).join(' → ')}`]);
+  }
+  if (CODE_FILE.test(resolved)) {
+    try {
+      return codeRails(resolved);
+    } catch (error) {
+      if (error instanceof RailsError) throw error;
+      throw new RailsError([`cannot load ${file}: ${(error as Error).message}`]);
+    }
   }
   let raw: unknown;
   try {

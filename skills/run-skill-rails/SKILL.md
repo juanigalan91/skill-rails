@@ -14,12 +14,12 @@ You do only the step that it gives you, one at a time.
 Resolve the caller’s rails file path relative to its SKILL.md when it supplies a relative link. Use the intended project directory for execution and state; with the CLI, add `--cwd <project-directory>` to each command if needed. With MCP, the server must be configured for that project.
 
 Use the MCP tools `rails_start` and `rails_done` when they are available.
-Otherwise use the CLI: `npx -y skill-rails@0.4 <command>`.
+Otherwise use the CLI: `npx -y skill-rails@0.5 <command>`.
 
 ## Step 1: Start
 
 ```bash
-npx -y skill-rails@0.4 start <rails.yaml> [--input <key>=<value> ...]
+npx -y skill-rails@0.5 start <rails.yaml> [--input <key>=<value> ...]
 ```
 
 Give only the inputs that the caller or the invocation text gives.
@@ -33,7 +33,7 @@ Act on its `status`:
 - `step` → do the step (see "Step types"), then run its `next` command, with your output as JSON in place of `<the output, as JSON>`:
 
   ```bash
-  npx -y skill-rails@0.4 done <rails> <id> --cwd '<project>' --output - <<'JSON'
+  npx -y skill-rails@0.5 done <rails> <id> --cwd '<project>' --output - <<'JSON'
   {"title": "Add the rails runner"}
   JSON
   ```

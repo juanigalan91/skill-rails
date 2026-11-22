@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-const RAILS_FILE = 'rails.yaml';
+const RAILS_FILES = ['rails.yaml', 'rails.ts'];
 
 const readJson = (file: string): unknown => {
   try {
@@ -46,7 +46,7 @@ function fromSkillFolders(skill: string, cwd: string, env: NodeJS.ProcessEnv): s
 }
 
 /**
- * The rails.yaml of a skill, from `<plugin>:<skill>` or `<skill>`.
+ * The rails file of a skill (rails.yaml, else rails.ts), from `<plugin>:<skill>` or `<skill>`.
  * The order: SKILL_RAILS_SKILLS_PATH, a plugin checkout above the calling rails file, the Claude Code plugin installs, then the skill folders.
  */
 export function resolveSkillRails(ref: string, from: string, { env = process.env, cwd = process.cwd() } = {}): string {
@@ -60,10 +60,12 @@ export function resolveSkillRails(ref: string, from: string, { env = process.env
     ...extra.flatMap((dir) => [...(plugin ? [path.join(dir, plugin, 'skills', skill)] : []), path.join(dir, skill)]),
     ...(plugin ? [...fromCheckout(plugin, skill, from), ...fromClaudeInstalls(plugin, skill, from, env)] : fromSkillFolders(skill, cwd, env)),
   ];
-  const found = candidates.find((dir) => fs.existsSync(path.join(dir, RAILS_FILE)));
-  if (found) return path.join(found, RAILS_FILE);
+  for (const dir of candidates) {
+    const file = RAILS_FILES.map((name) => path.join(dir, name)).find((candidate) => fs.existsSync(candidate));
+    if (file) return file;
+  }
   const where = plugin
     ? `SKILL_RAILS_SKILLS_PATH, a checkout of the plugin "${plugin}" above this rails file, or an installed plugin "${plugin}"`
     : 'SKILL_RAILS_SKILLS_PATH, .claude/skills, .agents/skills or ~/.claude/skills';
-  throw new Error(`cannot find the rails file of "skill:${ref}" (a ${RAILS_FILE} in ${where})`);
+  throw new Error(`cannot find the rails file of "skill:${ref}" (a rails.yaml or rails.ts in ${where})`);
 }

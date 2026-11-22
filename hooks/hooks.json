@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "i=$(cat); case \"$i\" in *rails_done*|*skill-rails*done*) printf '%s' \"$i\" | npx -y skill-rails@0.4 hook;; esac",
+            "command": "i=$(cat); case \"$i\" in *rails_done*|*skill-rails*done*) printf '%s' \"$i\" | npx -y skill-rails@0.5 hook;; esac",
             "timeout": 30
           }
         ]
@@ -18,7 +18,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "npx -y skill-rails@0.4 hook",
+            "command": "npx -y skill-rails@0.5 hook",
             "timeout": 30
           }
         ]

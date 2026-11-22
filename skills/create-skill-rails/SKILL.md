@@ -9,7 +9,7 @@ argument-hint: "<what the skill does>"
 Run [rails.yaml](rails.yaml) with the [run-skill-rails bootstrap](../run-skill-rails/SKILL.md). Resolve the rails file path relative to this SKILL.md. Use the MCP tools when available, or:
 
 ```bash
-npx -y skill-rails@0.4 start "<absolute-path-to-this-skill>/rails.yaml" --input request="<user request>" [--input target="<directory>"]
+npx -y skill-rails@0.5 start "<absolute-path-to-this-skill>/rails.yaml" --input request="<user request>" [--input target="<directory>"]
 ```
 
 Pass only inputs supplied by the user. Set `auto=true` only for an explicitly unattended run. The rails file owns the step order, scripts, validation, and failure gates. Do each pending agent step and report its schema-valid output using the bootstrap protocol; report failure if blocked.
