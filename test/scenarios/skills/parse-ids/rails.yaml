@@ -1,0 +1,36 @@
+name: parse-ids
+description: Find the IDs in a text, and confirm each protected ID with the user.
+inputs:
+  text: { required: true }
+  auto: { type: boolean, default: false }
+  required: { type: boolean, default: false }
+outputs:
+  ids: ${{ steps.select.outputs.ids }}
+  skipped: ${{ steps.select.outputs.skipped }}
+steps:
+  - id: parse
+    run: ids.mjs parse
+    env: { TEXT: '${{ inputs.text }}' }
+    stdout: json
+  - id: protected
+    if: ${{ !inputs.auto }}
+    foreach: ${{ steps.parse.outputs.protected }}
+    steps:
+      - id: confirm
+        ask:
+          - id: ok
+            header: Protected
+            question: '${{ item }} is protected. Read it?'
+            options:
+              - { label: Yes — read it, value: true }
+              - { label: No, value: false }
+  - id: select
+    run: ids.mjs select
+    env:
+      IDS: ${{ toJSON(steps.parse.outputs.ids) }}
+      PROTECTED: ${{ toJSON(steps.parse.outputs.protected) }}
+      ANSWERS: ${{ toJSON(steps.protected.outputs.results) }}
+      AUTO: ${{ inputs.auto }}
+    stdout: json
+  - if: ${{ inputs.required && !steps.select.outputs.ids[0] }}
+    fail: No ID to read.

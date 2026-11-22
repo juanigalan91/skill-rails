@@ -1,10 +1,12 @@
 export type JsonObject = { [key: string]: unknown };
 
 export interface InputSpec {
-  type?: 'string' | 'boolean' | 'number';
-  default?: string | boolean | number;
+  type?: 'string' | 'boolean' | 'number' | 'list';
+  default?: string | boolean | number | string[];
   required?: boolean;
   description?: string;
+  /** The allowed values: of the input, or of each item of a list. */
+  enum?: string[];
 }
 
 export type Condition = string | boolean;
@@ -16,8 +18,16 @@ interface BaseStep {
 
 export interface RunStep extends BaseStep {
   run: string;
+  /** Arguments added to the command, each one quoted: a list item that is a list adds each of its items, and an empty item adds nothing.
+   * A map item adds flags: true adds the flag, a list adds the flag before each item, another value adds the flag and the value. */
+  args?: unknown[];
   env?: Record<string, unknown>;
-  'continue-on-error'?: boolean;
+  /** Read the outputs from stdout: text (outputs.value), env (KEY=value lines), json (an object gives its keys; another value gives outputs.value) or jsonl (outputs.value is the list of the lines). */
+  stdout?: 'text' | 'env' | 'json' | 'jsonl';
+  /** Go on when the command fails; a list goes on only for these exit codes. */
+  'continue-on-error'?: boolean | number[];
+  /** The folder where the command runs, relative to the project. */
+  'working-directory'?: string;
   /** Poll: run again until this condition is true. */
   until?: Condition;
   'interval-seconds'?: number;
@@ -31,29 +41,47 @@ export interface ForeachStep extends BaseStep {
   steps: Step[];
 }
 
+export interface RepeatStep extends BaseStep {
+  id: string;
+  repeat: {
+    /** Checked after each iteration, with the results of that iteration: the loop ends when it is true. */
+    until: Condition;
+    'max-iterations'?: number;
+  };
+  steps: Step[];
+}
+
 export interface UsesStep extends BaseStep {
   id: string;
   /** The flow file, relative to the flow that uses it. */
   uses: string;
   with?: Record<string, unknown>;
   'continue-on-error'?: boolean;
+  /** A stop step of the other flow also ends this flow, with the same message and outcome. */
+  'forward-stop'?: boolean;
+  'working-directory'?: string;
   /** The loaded flow. */
   flow?: Flow;
 }
 
 export interface SkillStep extends BaseStep {
   id: string;
+  /** The folder where the agent does the step, relative to the project. */
+  'working-directory'?: string;
+  /** Go on when the agent reports that it cannot do the step. */
+  'continue-on-error'?: boolean;
   skill: string;
   with?: string;
   prompt?: string;
-  'prompt-file'?: string;
   output?: JsonObject;
 }
 
 export interface PromptStep extends BaseStep {
   id: string;
+  /** The folder where the agent does the step, relative to the project. */
+  'working-directory'?: string;
+  'continue-on-error'?: boolean;
   prompt?: string;
-  'prompt-file'?: string;
   output?: JsonObject;
 }
 
@@ -62,6 +90,8 @@ export interface Option {
   description: string;
   /** Text that the question tool shows next to the option, for example a draft to approve. */
   preview?: string;
+  /** The value that the step output holds when the user selects this option; default the label. */
+  value?: unknown;
 }
 
 export interface Question {
@@ -72,17 +102,26 @@ export interface Question {
   multiSelect?: boolean;
   /** The user answers with free text; the options are then suggestions. */
   free?: boolean;
+  /** The user can also type another answer: the output is the label or the text. */
+  other?: boolean;
   /** An option, or an expression that gives a list of options. */
   options?: Array<Option | string>;
 }
 
 export interface AskStep extends BaseStep {
   id: string;
-  ask: Question[];
+  /** The questions, or an expression that gives them (a question with no id gets q1, q2...). */
+  ask: Question[] | string;
+  /** A dynamic ask: the most questions to ask; default 4. */
+  max?: number;
+  /** A dynamic ask: options added to each question that has options. */
+  'extra-options'?: Option[];
 }
 
 export interface StopStep extends BaseStep {
-  stop: string;
+  stop?: string;
+  /** Short form of a stop with outcome failure. */
+  fail?: string;
   outcome?: 'success' | 'failure';
 }
 
@@ -90,25 +129,48 @@ export interface BreakStep extends BaseStep {
   break: true;
 }
 
-export type Step = RunStep | SkillStep | PromptStep | AskStep | StopStep | ForeachStep | UsesStep | BreakStep;
-export type StepKind = 'run' | 'skill' | 'prompt' | 'ask' | 'stop' | 'foreach' | 'uses' | 'break';
+/** Shows a message to the user, and the flow goes on. */
+export interface NoteStep extends BaseStep {
+  note: string;
+}
+
+/** Computes values with expressions, with their types: steps.<id>.outputs.<key>. */
+export interface SetStep extends BaseStep {
+  id: string;
+  set: Record<string, unknown>;
+}
+
+export type Step = RunStep | SkillStep | PromptStep | AskStep | StopStep | NoteStep | SetStep | ForeachStep | RepeatStep | UsesStep | BreakStep;
+export type StepKind = 'run' | 'skill' | 'prompt' | 'ask' | 'stop' | 'fail' | 'note' | 'set' | 'foreach' | 'repeat' | 'uses' | 'break';
 
 export interface Flow {
   name: string;
   description?: string;
   inputs: Record<string, InputSpec>;
   steps: Step[];
+  /** The values that the flow gives back at its end: an object of expressions, or one expression that gives an object. */
+  outputs?: Record<string, unknown> | string;
+  /** Steps that run when the flow fails, before the failed report. */
+  'on-failure'?: Step[];
   /** The folder of the flow file. */
   dir: string;
 }
 
-export type InputValue = string | number | boolean | null;
+export type InputValue = string | number | boolean | string[] | null;
 
 export interface StepResult {
   outcome: 'success' | 'failure' | 'skipped';
   exitCode?: number;
+  /** A failed run step: the last lines of its stderr. */
+  error?: string;
   outputs?: Record<string, unknown>;
+  /** An agent step: what the agent was asked. */
+  request?: StepRequest;
+  /** An agent step: the output as the agent reported it, or `{ $fail: reason }`. */
+  answer?: unknown;
 }
+
+export type StepRequest = Pick<PendingStep, 'type' | 'instructions' | 'skill' | 'args' | 'questions' | 'directory'>;
 
 export interface RenderedQuestion {
   id: string;
@@ -116,6 +178,7 @@ export interface RenderedQuestion {
   header: string;
   multiSelect: boolean;
   free: boolean;
+  other: boolean;
   options: Option[];
 }
 
@@ -128,13 +191,17 @@ export interface PendingStep {
   instructions?: string;
   questions?: RenderedQuestion[];
   output?: JsonObject;
+  /** The folder to work in, when it is not the project. */
+  directory?: string;
+  /** ask: the value of each option label, by question id. */
+  values?: Record<string, Record<string, unknown>>;
   /** Earliest time to resume a polling step, in Unix milliseconds. */
   retryAt?: number;
 }
 
-/** A running list of steps: the root flow, a sub-flow, or one iteration of a foreach. */
+/** A running list of steps: the root flow, a sub-flow, or one iteration of a foreach or a repeat. */
 export interface Frame {
-  kind: 'root' | 'flow' | 'foreach';
+  kind: 'root' | 'flow' | 'foreach' | 'repeat';
   /** The id of the step that started the frame (none for the root). */
   id?: string;
   name: string;
@@ -142,9 +209,19 @@ export interface Frame {
   steps: Step[];
   index: number;
   inputs: Record<string, InputValue>;
+  /** root and flow: the outputs of the flow. */
+  outputs?: Record<string, unknown> | string;
+  /** root and flow: the failure steps, and the failure that runs them. */
+  onFailure?: Step[];
+  failure?: { message: string | null };
+  /** flow: the folder where its commands and agent steps run, when it is not the project. */
+  cwd?: string;
   results: Record<string, StepResult>;
   /** foreach: the items, the current position, and the results of the finished iterations. */
   items?: unknown[];
+  /** repeat: the end condition and the maximum number of iterations. */
+  until?: Condition;
+  maxIterations?: number;
   position?: number;
   iterations?: Array<{ item: unknown; steps: Record<string, StepResult> }>;
   /** run steps with until: when the polling started. */
@@ -154,6 +231,8 @@ export interface Frame {
 
 export interface State {
   flow: Flow;
+  /** The flow file, for record. */
+  file?: string;
   cwd: string;
   /** The root frame first. */
   frames: Frame[];
@@ -161,6 +240,17 @@ export interface State {
   status: 'running' | 'done' | 'failed';
   pending: PendingStep | null;
   message: string | null;
+  /** The outputs of the flow, at its end. */
+  outputs?: Record<string, unknown>;
+}
+
+export interface LoopContext {
+  index: number;
+  number: number;
+  count: number;
+  previous: Record<string, StepResult> | null;
+  /** The loop around this one. */
+  parent: LoopContext | null;
 }
 
 export interface Context {
@@ -169,11 +259,16 @@ export interface Context {
   env: Record<string, string | undefined>;
   flow: { name: string; dir: string };
   item: unknown;
-  loop: { index: number; count: number } | null;
+  /** In on-failure steps: the reason of the failure. */
+  failure: { message: string | null } | null;
+  /** previous: the step results of the last finished iteration. */
+  loop: LoopContext | null;
 }
 
 export interface RunOptions {
   env?: Record<string, unknown>;
+  args?: unknown[];
+  stdout?: RunStep['stdout'];
   dir: string;
   cwd: string;
   timeoutMs?: number;
@@ -182,7 +277,7 @@ export interface RunOptions {
 export interface RunResult {
   outcome: 'success' | 'failure';
   exitCode: number;
-  outputs: Record<string, string>;
+  outputs: Record<string, unknown>;
   warnings: string[];
   stderr: string;
 }
@@ -192,9 +287,9 @@ export type Exec = (command: string, options: RunOptions) => RunResult;
 /** What the agent reads after each command. */
 export type Report = (
   | ({ status: 'step'; flow: string; notes?: string[] } & PendingStep)
-  | { status: 'done' | 'failed' | 'running'; flow: string; message: string | null; notes?: string[] }
+  | { status: 'done' | 'failed' | 'running'; flow: string; message: string | null; outputs?: Record<string, unknown>; notes?: string[] }
   | { status: 'invalid'; id: string; errors: string[]; output?: JsonObject }
   | { status: 'error'; errors: string[] }
   | { status: 'ok'; flow: string; steps: number }
   | { status: 'reset'; flow: string }
-) & { cwd?: string };
+) & { cwd?: string; next?: string; /** start: how the agent acts on each result. */ protocol?: string };

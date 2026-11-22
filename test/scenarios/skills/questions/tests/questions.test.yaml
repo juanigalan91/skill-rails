@@ -1,0 +1,21 @@
+flow: ../rails.yaml
+git: false
+tests:
+  - name: two questions are asked, a typed answer is accepted, and the third question is left out
+    answers:
+      investigate:
+        questions:
+          - { question: Which database?, header: A long database header, options: [SQL, NoSQL], other: true }
+          - { question: Which region?, options: [EU, US] }
+          - { question: Dropped? }
+      answers: { q1: A graph database, q2: I don't know }
+      write: {}
+    expect:
+      status: done
+      outputs: { answers.q1: A graph database, answers.q2: I don't know }
+  - name: no question skips the ask step
+    answers:
+      investigate: { questions: [] }
+      write: {}
+    expect:
+      steps: { answers: skipped }

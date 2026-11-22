@@ -1,0 +1,17 @@
+flow: ../rails.yaml
+git: false
+tests:
+  - name: a skill of the plugin runs in the folder, by its skill name
+    answers:
+      tidy: {}
+      gate/ready: { go: Finish }
+    expect:
+      status: done
+      message: /Done in .*\/work$/
+      steps: { gate/ready: success }
+  - name: a stop in the sub-flow ends the caller with its message
+    answers:
+      tidy: {}
+      ready: { go: Not now }
+    expect:
+      message: Not finished.

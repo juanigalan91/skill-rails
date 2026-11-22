@@ -13,14 +13,8 @@ Resolve [rails.yaml](rails.yaml) relative to this SKILL.md and substitute its ab
 1. Start the flow:
 
    ```bash
-   npx -y skill-rails@0.2 start "<absolute-path-to-this-skill>/rails.yaml" [--input <key>=<value> ...]
+   npx -y skill-rails@0.3 start "<absolute-path-to-this-skill>/rails.yaml" [--input <key>=<value> ...]
    ```
 
-2. Act on the `status` of each result:
-   - `step` → do the step, then run `npx -y skill-rails@0.2 done <flow> <id> --output - <<'JSON' ... JSON` with an output that matches `output`.
-     For a `skill` step, load and follow the named skill using the host’s supported mechanism with `args` first; report failure if unavailable.
-     For an `ask` step, ask the `questions` as they are, display descriptions and previews, wait for the user’s reply, and report one property per question id. Use chat when a question tool cannot represent the question. Never invent an answer.
-     For a `wait` step, wait until `retryAt` (Unix milliseconds), then report it done with no output.
-   - `invalid` → correct the output and run `done` again.
-   - `done`, `failed` or `error` → tell the user `message` or `errors`, and stop.
+2. Follow the `protocol` of the first result until the flow ends.
 3. Do only the step that the runner gives you, and never run the shell steps of the flow yourself.

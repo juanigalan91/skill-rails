@@ -6,7 +6,7 @@ inputs:
   auto: { type: boolean, default: false, description: Explicit unattended mode; never ask questions. }
 steps:
   - id: plan
-    prompt-file: prompts/plan.md
+    prompt: prompts/plan.md
     output:
       type: object
       additionalProperties: false
@@ -23,34 +23,34 @@ steps:
             required: [id, type, purpose]
             properties:
               id: { type: string, minLength: 1 }
-              type: { enum: [run, prompt, skill, ask, stop, foreach, uses, break] }
+              type: { enum: [run, prompt, skill, ask, stop, foreach, repeat, uses, break] }
               purpose: { type: string, minLength: 1 }
   - id: scaffold
-    run: node "$FLOW_DIR/scripts/scaffold.mjs"
+    run: scaffold.mjs
     env:
       TARGET: ${{ inputs.target || steps.plan.outputs.target }}
       SOURCE: ${{ inputs.source }}
       NAME: ${{ steps.plan.outputs.name }}
       DESCRIPTION: ${{ steps.plan.outputs.description }}
   - id: author
-    prompt-file: prompts/author.md
+    prompt: prompts/author.md
   - id: check
-    run: node "$FLOW_DIR/scripts/validate.mjs"
+    run: validate.mjs
     env:
       TARGET: ${{ steps.scaffold.outputs.target }}
   - id: fix
     if: ${{ steps.check.outputs.valid != 'true' }}
-    prompt-file: prompts/fix.md
+    prompt: prompts/fix.md
   - id: recheck
     if: ${{ steps.check.outputs.valid != 'true' }}
-    run: node "$FLOW_DIR/scripts/validate.mjs"
+    run: validate.mjs
     env:
       TARGET: ${{ steps.scaffold.outputs.target }}
   - if: ${{ steps.check.outputs.valid != 'true' && steps.recheck.outputs.valid != 'true' }}
     stop: 'Validation failed for ${{ steps.scaffold.outputs.target }}. ${{ steps.recheck.outputs.errors }}'
     outcome: failure
   - id: smoke
-    prompt-file: prompts/smoke.md
+    prompt: prompts/smoke.md
     output:
       type: object
       required: [report, files, codeSteps, agentSteps]

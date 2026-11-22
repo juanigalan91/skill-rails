@@ -4,6 +4,8 @@ Skill to update in place: ${{ steps.context.outputs.source }}
 Destination: ${{ steps.context.outputs.target }}
 Additional request: ${{ inputs.request }}
 Unattended: ${{ inputs.auto }}
+Assessment: ${{ steps.assess.outputs.verdict }} (${{ join(steps.assess.outputs.reasons, '; ') }})
+Files that stay Markdown, unchanged: ${{ join(steps.assess.outputs.keep, ', ') }}
 
 Read the entire original SKILL.md, every file it loads (mode files, templates, references, rule files), every script it runs, and any skills it invokes. Record the inputs and outputs, conditions and gates, and all rules. Split mixed Markdown steps into mechanical scripts, judgment prompts, user questions, skill calls, and stops.
 

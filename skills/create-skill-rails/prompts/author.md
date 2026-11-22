@@ -6,8 +6,8 @@ Existing skill to update, if migrating: ${{ inputs.source }}
 
 For creation, the runner created scripts/, prompts/, tests/, and SKILL.md from the packaged template. For migration, it ensured those directories exist while leaving the current SKILL.md for you to replace directly. Finish the wrapper's inputs and instructions without moving the folder. Keep the bootstrap protocol, relative flow resolution, project directory, schema recovery, failure handling, questions that wait for the user, and polling retryAt behavior.
 
-- rails.yaml holds the order, conditions, and inputs. Use run: <script>.sh and prompt-file: prompts/<id>.md.
-- Shell scripts start with #!/usr/bin/env bash and set -eo pipefail. Make them executable. Outputs use FLOW_OUTPUT (key=value or multiline delimiters); user notes use ::warning::.
+- rails.yaml holds the order, conditions, and inputs. Use run: <script>.sh and prompt: prompts/<id>.md.
+- Shell scripts start with #!/usr/bin/env bash and set -eo pipefail; Node scripts start with #!/usr/bin/env node. Make every script executable and run it by name (run: build.sh), with no $FLOW_DIR path: scripts/ is in PATH. Outputs use FLOW_OUTPUT (key=value or multiline delimiters); user notes use ::warning::.
 - Never interpolate expressions into run commands. Pass values through env instead: the format checker rejects expressions in run.
 - Prompts may interpolate previous outputs with the documented expression syntax. Keep schemas to the values used by later steps or the final report.
 - Every ask option needs a label and description. Unattended paths cannot ask questions.

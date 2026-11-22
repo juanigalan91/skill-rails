@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -7,7 +8,7 @@ const target = path.resolve(process.env.TARGET);
 const errors = [];
 const invoke = (args) => {
   // Use the published runner so Git-installed plugins need no local node_modules.
-  const result = spawnSync('npx', ['-y', 'skill-rails@0.2', ...args], { encoding: 'utf8', timeout: 120000, maxBuffer: 4 * 1024 * 1024 });
+  const result = spawnSync('npx', ['-y', 'skill-rails@0.3', ...args], { encoding: 'utf8', timeout: 120000, maxBuffer: 4 * 1024 * 1024 });
   let report;
   try { report = JSON.parse(result.stdout); } catch { /* Report command failures below. */ }
   if (result.error || result.status !== 0 || report === undefined) {

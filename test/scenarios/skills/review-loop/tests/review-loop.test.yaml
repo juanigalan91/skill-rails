@@ -1,0 +1,23 @@
+flow: ../rails.yaml
+git: false
+tests:
+  - name: a typed change goes into the next draft, then the user approves
+    answers:
+      draft: [{ text: first }, { text: second }]
+      decide: [{ answer: Make it shorter }, { answer: Approve }]
+    expect:
+      status: done
+      flow-outputs: { draft: second }
+  - name: the user stops
+    answers:
+      draft: { text: first }
+      decide: { answer: Stop }
+    expect:
+      message: Stopped with no draft.
+  - name: no approval after the last version fails
+    answers:
+      draft: { text: x }
+      decide: { answer: Again }
+    expect:
+      status: failed
+      message: /not approved after 3 versions/

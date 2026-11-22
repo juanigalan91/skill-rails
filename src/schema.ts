@@ -16,6 +16,19 @@ export const formatErrors = (prefix: string, errors: ErrorObject[] | null | unde
     return `${prefix}${error.instancePath} ${error.message ?? 'is not valid'}${extra}`.trim();
   });
 
+// strictSchema refuses unknown keywords: a YAML flow map with a comma in a description splits it into stray keys.
+const strict = new Ajv({ allErrors: true, strict: false, strictSchema: true });
+
+/** The problems of an output schema, found before the flow runs. */
+export function checkOutputSchema(outputSchema: JsonObject): string[] {
+  try {
+    strict.compile(outputSchema);
+    return [];
+  } catch (error) {
+    return [(error as Error).message.replace(/^strict mode: /, '')];
+  }
+}
+
 /** Validates a step output against the JSON Schema of the step. Returns the errors. */
 export function validateOutput(outputSchema: JsonObject, value: unknown): string[] {
   const check = ajv.compile(outputSchema);

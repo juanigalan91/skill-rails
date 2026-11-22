@@ -1,0 +1,14 @@
+flow: ../rails.yaml
+git: false
+path: [stubs]
+tests:
+  - name: the step polls until the checks end
+    expect:
+      status: done
+      message: All checks passed.
+      files: { .calls: "2\n" }
+  - name: failed checks fail the flow with their names
+    env: { CI_RESULT: failed }
+    expect:
+      status: failed
+      message: 'Checks failed: lint, test'

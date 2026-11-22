@@ -1,0 +1,12 @@
+flow: ../rails.yaml
+git: false
+env: { DEMO_BRANCH: topic }
+tests:
+  - name: the plugin script runs by name, and its lines become the flow outputs
+    expect:
+      status: done
+      flow-outputs: { BRANCH: topic, BASE: main }
+  - name: a flag map adds --base only when the input is set
+    inputs: { base: develop }
+    expect:
+      flow-outputs: { BASE: develop }

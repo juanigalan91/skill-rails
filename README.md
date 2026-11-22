@@ -34,7 +34,7 @@ Markdown is a good format for instructions, examples, and judgment. A Markdown s
 | Mechanical work | The agent calls commands or a bundled script | Consecutive shell steps execute without a model turn between them |
 | Values between steps | The agent tracks values or reads script outputs | Named outputs are available to later expressions; agent outputs can have JSON Schemas |
 | User questions | The agent asks and interprets replies | `ask` defines the questions and validates submitted labels or free-text values |
-| Loops and reuse | Instructions or scripts describe the repetition | `foreach`, polling, and subflows make the control flow explicit |
+| Loops and reuse | Instructions or scripts describe the repetition | `foreach`, `repeat`, polling, and subflows make the control flow explicit |
 | Testing | Scripts can be tested; prompt behavior needs separate evaluation | Fixed agent answers let tests exercise branches, scripts, files, and outputs without a model |
 | Inspection and continuation | Depend on the host session and any custom scripts | `status` exposes saved progress and the pending step between calls |
 
@@ -85,7 +85,7 @@ steps:
   - id: body-file
     run: body-file.sh                  # copies the template
   - id: text
-    prompt-file: prompts/text.md       # the agent fills the body and writes the title
+    prompt: prompts/text.md            # the agent fills the body and writes the title
     output:
       type: object
       required: [title]
@@ -171,6 +171,12 @@ These are small samples on simple inputs.
 The gain is largest when a skill has many mechanical steps.
 It is small when most of the work is research that only the model can do.
 
+## Upgrading from 0.2
+
+Version 0.3 removes `prompt-file`. Replace `prompt-file: prompts/text.md` with `prompt: prompts/text.md`. A single word ending in `.md` is read as a path relative to the workflow; other text is treated as inline instructions. This applies to prompt and skill steps.
+
+Update pinned CLI/MCP commands to `skill-rails@0.3` and validate your workflows with `skill-rails check` before running them. Explicit output schemas are now checked for unknown keywords when loading a workflow.
+
 ## Install
 
 As a Claude Code plugin, with the skills and the MCP server:
@@ -203,7 +209,7 @@ import { start, done } from 'skill-rails';
 The MCP server works with any MCP client:
 
 ```json
-{ "mcpServers": { "skill-rails": { "command": "npx", "args": ["-y", "skill-rails@0.2", "mcp"] } } }
+{ "mcpServers": { "skill-rails": { "command": "npx", "args": ["-y", "skill-rails@0.3", "mcp"] } } }
 ```
 
 ## Other agents
@@ -260,6 +266,36 @@ $ skill-rails test
 A test fails when the flow asks for a step that has no answer, when an answer is never used, when an answer does not match its schema, or when the result is not the expected one.
 See [Testing flows](docs/testing.md).
 
+## Tests and evals
+
+A skill-rails test replaces the model with fixed answers, and runs the real flow.
+It proves the step order, the gates, the failure paths, the scripts, the files, and the contracts with the callers.
+It costs no tokens, gives the same result on each run, and can block a merge.
+It does not prove the quality of the model's judgment, that an agent follows the protocol, or that the host picks the skill.
+
+An eval runs a real model and grades its output.
+It tests judgment, costs tokens, and can give a different result on each run.
+
+A flow makes evals smaller:
+
+- Use deterministic tests for scripts and gates; keep fixtures and stubs representative.
+- Each prompt step is a small eval unit, with fixed instructions, a rendered context and an output schema.
+- The schema makes the structure checks free.
+- The runner enforces submitted step order; evaluate judgment and protocol compliance separately.
+
+The tools:
+
+| Tool | Use |
+|------|-----|
+| Fixed answers | Every commit: the paths of the flow, with no model. |
+| Live steps and `judge` | Evaluate one step in its real context, with a rubric. |
+| `mode: agent` | A protocol smoke run on each host, and trigger checks. |
+| `skill-rails record` | A real run becomes a regression test. |
+| `skill-rails trace` | Real runs become an eval dataset, one line per step. |
+
+Host-level skill-selection evals are complementary: they check whether the agent picks the skill for the right requests.
+See [Testing flows](docs/testing.md).
+
 ## CLI
 
 ```text
@@ -269,6 +305,9 @@ skill-rails done <flow> <step-id> --fail <reason>           end the flow with an
 skill-rails status <flow>                                   print the current step and the step results
 skill-rails reset <flow>                                    delete the state of a flow
 skill-rails check <rails.yaml>                               check a flow file without running it
+skill-rails test [<file or folder> ...] [--live] [--agent <command>]   run the flow tests; --live also runs the tests that need a real agent
+skill-rails record <flow> [--out <file>]                    write a test file from a run of the flow
+skill-rails trace <flow>                                    print one JSON line per agent step of a run
 skill-rails mcp                                             run the MCP server on stdio
 ```
 

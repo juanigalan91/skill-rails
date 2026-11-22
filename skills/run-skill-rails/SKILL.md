@@ -14,12 +14,12 @@ You do only the step that it gives you, one at a time.
 Resolve the caller’s flow path relative to its SKILL.md when it supplies a relative link. Use the intended project directory for execution and state; with the CLI, add `--cwd <project-directory>` to each command if needed. With MCP, the server must be configured for that project.
 
 Use the MCP tools `flow_start` and `flow_done` when they are available.
-Otherwise use the CLI: `npx -y skill-rails@0.2 <command>`.
+Otherwise use the CLI: `npx -y skill-rails@0.3 <command>`.
 
 ## Step 1: Start
 
 ```bash
-npx -y skill-rails@0.2 start <rails.yaml> [--input <key>=<value> ...]
+npx -y skill-rails@0.3 start <rails.yaml> [--input <key>=<value> ...]
 ```
 
 Give only the inputs that the caller or the invocation text gives.
@@ -30,18 +30,18 @@ Never guess an input.
 The runner prints one JSON object.
 Act on its `status`:
 
-- `step` → do the step (see "Step types"), then report its output:
+- `step` → do the step (see "Step types"), then run its `next` command, with your output as JSON in place of `<the output, as JSON>`:
 
   ```bash
-  npx -y skill-rails@0.2 done <flow> <id> --output - <<'JSON'
+  npx -y skill-rails@0.3 done <flow> <id> --cwd '<project>' --output - <<'JSON'
   {"title": "Add the flow runner"}
   JSON
   ```
 
-  With no `output` in the step, leave out `--output -` and the heredoc.
+  With no `output` in the step, `next` has no `--output -` and no heredoc.
   If you cannot do the step, run `done <flow> <id> --fail "<reason>"`.
 - `invalid` → read `errors`, correct the output, and run `done` again.
-- `done` → tell the user `message`, and stop.
+- `done` → tell the user `message`, give the caller `outputs` when the result has them, and stop.
 - `failed` or `error` → tell the user `message` or `errors`, and stop.
 
 When the object has `notes`, tell them to the user.
