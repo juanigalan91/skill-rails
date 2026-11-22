@@ -336,9 +336,12 @@ skill-rails mcp                                             run the MCP server o
 
 ```bash
 yarn install
+yarn lint
 yarn typecheck
 yarn test
 ```
+
+`yarn lint` checks YAML syntax throughout the repository and validates workflow keys and types against the shared schema. CI and npm pre-publish checks run it too. VS Code and Cursor users can install the recommended YAML and ESLint extensions for diagnostics and completion; see [YAML linting](docs/format.md#yaml-linting). The development lint plugins require Node 20.19+, 22.13+, or 24+.
 
 ## License
 

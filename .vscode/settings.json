@@ -1,0 +1,19 @@
+{
+  "eslint.validate": ["yaml"],
+  "yaml.validate": true,
+  "yaml.schemas": {
+    "./schema/flow.schema.json": [
+      "**/rails.yaml",
+      "**/rails.yml",
+      "skills/**/*.yaml",
+      "skills/**/*.yml",
+      "examples/**/*.yaml",
+      "examples/**/*.yml",
+      "test/scenarios/skills/**/*.yaml",
+      "test/scenarios/skills/**/*.yml",
+      "!**/*.test.yaml",
+      "!**/*.test.yml",
+      "!**/tests/**"
+    ]
+  }
+}

@@ -30,6 +30,16 @@ steps:
       TITLE: ${{ steps.text.outputs.title }}
 ```
 
+## YAML linting
+
+Run `yarn lint` from the checkout to check all YAML syntax and validate workflows against `schema/flow.schema.json`. ESLint uses `eslint-plugin-yml` and `eslint-plugin-json-schema-validator`; schema validation uses the local file and disables SchemaStore lookups. Changes to allowed keys in the schema therefore apply to linting too.
+
+Workflow schema checks cover `rails.yaml`/`rails.yml` and YAML subflows under `skills/`, `examples/`, and `test/scenarios/skills/`. Test definitions (`*.test.yaml`, `*.test.yml`, and files under `tests/`) and GitHub Actions files receive YAML syntax checks without the workflow schema, because they use different formats. Ignored dependency/build directories are excluded.
+
+Install the recommended **YAML** (Red Hat) and **ESLint** extensions in VS Code or Cursor. The repository settings associate workflows with the same local schema for allowed-key completion and validation. For a workflow outside the configured paths, add its glob to both `eslint.config.js` and `.vscode/settings.json`.
+
+Linting checks YAML structure, keys, and types. Use `skill-rails check path/to/rails.yaml` for runner-specific validation such as duplicate step IDs, expressions, prompt files, and subflow resolution. Neither command executes workflow steps.
+
 ## Folder layout
 
 ```text

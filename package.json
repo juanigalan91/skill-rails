@@ -34,7 +34,8 @@
     "typecheck": "tsc -p tsconfig.test.json",
     "test": "yarn build && vitest run",
     "prepack": "yarn build",
-    "prepublishOnly": "yarn typecheck && yarn test"
+    "prepublishOnly": "yarn lint && yarn typecheck && yarn test",
+    "lint": "eslint \"**/*.{yaml,yml}\" --max-warnings 0"
   },
   "keywords": [
     "agent",
@@ -55,6 +56,9 @@
   "devDependencies": {
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^22.20.5",
+    "eslint": "^9.39.5",
+    "eslint-plugin-json-schema-validator": "^6.3.2",
+    "eslint-plugin-yml": "^3.10.0",
     "typescript": "^5.9.3",
     "vitest": "^4.1.4"
   },
