@@ -73,6 +73,7 @@ export function advanceCode(state: State, { exec = runCommand }: { exec?: Exec }
         stdout: mode,
         dir: state.rails.dir,
         cwd: options.cwd ? path.resolve(state.cwd, options.cwd) : state.cwd,
+        step: id,
         ...(options.timeoutMinutes ? { timeoutMs: options.timeoutMinutes * 60_000 } : {}),
       });
       state.notes.push(...result.warnings);
@@ -146,7 +147,7 @@ export function advanceCode(state: State, { exec = runCommand }: { exec?: Exec }
           inputs,
           state.cwd,
         ));
-        advanceRun(child, exec);
+        advanceRun(child, (command, options) => exec(command, { ...options, step: options.step && `${id}/${options.step}` }));
         state.notes.push(...child.notes.splice(0));
         if (child.pending) return suspend({ ...child.pending, id: `${id}/${child.pending.id}` });
         // A failed nested run keeps its outputs, as a failed YAML uses step does.

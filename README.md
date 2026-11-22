@@ -152,16 +152,16 @@ These tests check execution paths and output contracts. Live steps and judges ev
 
 ## Benchmark
 
-The same four skills ran as plain Markdown, as a YAML rails file, and as a TypeScript rails file: 5 headless runs of each, 60 in total, with Claude Sonnet, stub commands, and a local Git fixture. Every run of every variant did the task correctly.
+The same four skills ran as plain Markdown, as a YAML rails file, and as a TypeScript rails file: 5 headless runs of each, with Claude Sonnet, stub commands, and a local Git fixture. Every run of every variant did the task correctly.
 
 | Task | Markdown | YAML rails | TypeScript rails |
 |---|---|---|---|
 | Push a branch (one script) | 4 turns · 6 s · $0.054 | 4 turns · 7 s · $0.056 | 4 turns · 8 s · $0.056 |
 | Read the PR context (one script) | 4 turns · 8 s · $0.055 | 4 turns · 8 s · $0.057 | 4 turns · 7 s · $0.057 |
-| Run the checks (judgment-heavy) | 5 turns · 12 s · $0.069 | 8 turns · 17 s · $0.090 | 8 turns · 19 s · $0.091 |
-| Open a PR, unattended (many mechanical steps) | 23 turns · 36 s · $0.178 | 10 turns · 20 s · $0.104 | 10 turns · 19 s · $0.100 |
+| Run the checks (judgment-heavy) | 5 turns · 12 s · $0.069 | 6 turns · 16 s · $0.078 | 6 turns · 14 s · $0.077 |
+| Open a PR, unattended (many mechanical steps) | 23 turns · 36 s · $0.178 | 8 turns · 17 s · $0.094 | 8 turns · 18 s · $0.094 |
 
-Medians. The gain grows with the mechanical steps: the PR workflow took 57% fewer turns and cost 42% less. A one-script skill gains nothing. A skill made mostly of agent steps can cost more, because each agent step is a turn. YAML and TypeScript give the agent the same steps, so their difference shows the noise of the measure; the TypeScript runner adds about 5 ms per call.
+Medians. The gain grows with the mechanical steps: the PR workflow took 65% fewer turns and cost 47% less. A one-script skill gains nothing. A skill made mostly of agent steps can cost more, because each agent step is a turn: give its mechanical parts to scripts. YAML and TypeScript give the agent the same steps, so their difference shows the noise of the measure; the TypeScript runner adds about 5 ms per call.
 
 This is a small sample of one set of skills. See [the method and the full results](docs/benchmarks.md), and run your own with `skill-rails bench`.
 

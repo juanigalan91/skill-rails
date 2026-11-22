@@ -29,6 +29,43 @@ const run = (test: string) => {
 };
 
 describe('runTest', () => {
+  it('replaces a run step with its fixed answer, and a nested one only with its scoped key', () => {
+    const dir = tempDir({
+      'child.yaml': "name: child\noutputs: { n: '${{ steps.count.outputs.n }}' }\nsteps:\n  - id: count\n    run: exit 3\n",
+      'rails.yaml': "name: t\nsteps:\n  - id: count\n    run: exit 3\n  - id: kid\n    uses: child.yaml\n  - stop: '${{ steps.count.outputs.n }} ${{ steps.kid.outputs.n }}'\n",
+      'tests/t.test.yaml': 'rails: ../rails.yaml\nanswers:\n  count: { n: 1 }\n  kid/count: { n: 2 }\nexpect: { status: done, message: 1 2 }\n',
+    });
+    const [test] = loadTests(path.join(dir, 'tests', 't.test.yaml'));
+    expect(runTest(test!)).toMatchObject({ passed: true });
+  });
+
+  it('keeps a bare agent answer from replacing a nested shell command with the same id', () => {
+    const dir = tempDir({
+      'child.yaml': "name: child\noutputs: { n: '${{ steps.count.outputs.n }}' }\nsteps:\n  - id: count\n    run: echo n=actual\n    stdout: env\n",
+      'rails.yaml': "name: t\nsteps:\n  - id: count\n    prompt: Give a number.\n  - id: kid\n    uses: child.yaml\n  - stop: '${{ steps.count.outputs.n }} ${{ steps.kid.outputs.n }}'\n",
+      'tests/t.test.yaml': 'rails: ../rails.yaml\nanswers: { count: { n: agent } }\nexpect: { status: done, message: agent actual }\n',
+    });
+    expect(runTests([dir])).toEqual([expect.objectContaining({ passed: true })]);
+  });
+
+  it('stubs deeply nested TypeScript shell calls and preserves overrides after agent handoffs', () => {
+    const dir = tempDir({
+      'rails.ts': "export default { name: 'parent', run({ uses, sh }) { const child = uses('mid', 'mid.ts'); const end = sh.with({id:'finish'}).env('exit 9'); return child.n + ' ' + end.result; } };",
+      'mid.ts': "export default { name: 'mid', run({ uses, prompt }) { const child = uses('kid', 'child.yaml'); prompt('review', 'Review.'); return { outputs: child }; } };",
+      'child.yaml': "name: child\noutputs: { n: '${{ steps.count.outputs.n }}' }\nsteps:\n  - id: count\n    run: exit 8\n",
+      'tests/t.test.yaml': 'rails: ../rails.ts\nanswers:\n  mid/kid/count: { n: nested }\n  mid/review: {}\n  finish: { result: final, $files: { marker.txt: mocked } }\nexpect:\n  status: done\n  message: nested final\n  files: { marker.txt: mocked }\n',
+    });
+    expect(runTests([dir])).toEqual([expect.objectContaining({ passed: true })]);
+  });
+
+  it('uses a separate fixed shell answer for each iteration, including failure and file effects', () => {
+    const dir = tempDir({
+      'rails.yaml': "name: t\nsteps:\n  - id: each\n    foreach: [1, 2]\n    steps:\n      - id: call\n        run: exit 9\n        continue-on-error: true\n  - stop: '${{ steps.each.outputs.results[0].steps.call.outputs.n }} ${{ steps.each.outputs.results[1].steps.call.outcome }}'\n",
+      'tests/t.test.yaml': 'rails: ../rails.yaml\nanswers:\n  call:\n    - { n: 1, $files: { marker.txt: mocked } }\n    - { $fail: blocked }\nexpect:\n  status: done\n  message: 1 failure\n  files: { marker.txt: mocked }\n',
+    });
+    expect(runTests([dir])).toEqual([expect.objectContaining({ passed: true })]);
+  });
+
   it('passes when the run takes the expected path', () => {
     const result = run(`
 rails: ../rails.yaml

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.0
+
+- Allow fixed test answers to replace YAML `run` steps and TypeScript `sh` calls, including nested runs, repeated answers, file effects, and failures. Scoped keys keep nested shell overrides separate from bare agent answers.
+- Generate CLI continuation commands using the current installed build through Node, while preserving the `SKILL_RAILS_COMMAND` override and npx fallback.
+- Recognize quoted executable paths in question-hook completion checks.
+- Update benchmark results and document the effect of moving mechanical agent work into scripts.
+
 ## 0.5.0
 
 - Add TypeScript and JavaScript rails files with `defineRails`, typed inputs and outputs, shell helpers, prompts, skills, conditional questions, and nested YAML or TypeScript runs.

@@ -83,7 +83,7 @@ Configure a local stdio server in an MCP client:
   "mcpServers": {
     "skill-rails": {
       "command": "npx",
-      "args": ["-y", "skill-rails@0.5", "mcp"]
+      "args": ["-y", "skill-rails@0.6", "mcp"]
     }
   }
 }

@@ -8,7 +8,8 @@ import { done, start } from './api.js';
 import { readState } from './state.js';
 import { rootResults } from './engine.js';
 import { loadRails } from './rails.js';
-import type { PendingStep, Report, State, StepResult } from './types.js';
+import { runCommand } from './run.js';
+import type { Exec, PendingStep, Report, State, StepResult } from './types.js';
 
 const MAX_STEPS = 500;
 const agentTimeoutMinutes = () => Number(process.env.SKILL_RAILS_AGENT_TIMEOUT_MINUTES ?? 10);
@@ -304,6 +305,8 @@ interface Run {
   notes: string[];
   /** Agent mode: the stdout of the agent. */
   transcript?: string;
+  /** Runs the commands, with the fixed answers of the run steps. */
+  exec?: Exec;
 }
 
 function stateOf(run: Run): State | undefined {
@@ -327,11 +330,19 @@ function liveStep(step: PendingStep, guidance: string, run: Run): Report {
       errors = [(error as Error).message];
       continue;
     }
-    const next = done({ rails: run.railsName, id: step.id, output, cwd: run.cwd });
+    const next = done({ rails: run.railsName, id: step.id, output, cwd: run.cwd, exec: run.exec });
     if (next.status !== 'invalid') return next;
     errors = next.errors;
   }
   throw new Error(`live step "${step.id}": the reply is not valid: ${errors.join('; ')}`);
+}
+
+function writeFiles(cwd: string, files: Record<string, string> = {}): void {
+  for (const [rel, content] of Object.entries(files)) {
+    const target = path.resolve(cwd, rel);
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(target, content);
+  }
 }
 
 /** Drives the run with the answers of the test. Returns the last report. */
@@ -344,7 +355,26 @@ function driveRails(run: Run): Report {
     if ('notes' in r && r.notes) run.notes.push(...r.notes);
     return r;
   };
-  let report: Report = collect(start({ file: path.resolve(run.dir, test.rails), inputs: substitute(test.inputs ?? {}, vars), cwd }));
+  // A fixed answer of a run step replaces its command: the answer gives the outputs, or $fail the error.
+  const exec: Exec = (command, options) => {
+    // A nested step needs its <uses id>/<step id> key, so that a bare key stays the answer of an agent step.
+    const parts = options.step?.split('/') ?? [];
+    const keys = parts.length === 1 ? parts : parts.slice(0, -1).map((_, i) => parts.slice(i).join('/'));
+    const key = keys.find((candidate) => candidate in answers);
+    if (!key) return runCommand(command, options);
+    const count = used.get(key) ?? 0;
+    const given = answers[key];
+    const answer = (Array.isArray(given) ? given[count] : given) as ({ $files?: Record<string, string>; $fail?: string } & Record<string, unknown>) | undefined;
+    if (!answer) throw new Error(`the run ran step "${options.step}" a ${count + 1}th time, and the test has ${count} answers for it`);
+    used.set(key, count + 1);
+    const { $files, $fail, ...outputs } = answer;
+    writeFiles(cwd, $files);
+    return $fail === undefined
+      ? { outcome: 'success', exitCode: 0, outputs, warnings: [], stderr: '' }
+      : { outcome: 'failure', exitCode: 1, outputs, warnings: [], stderr: $fail };
+  };
+  run.exec = exec;
+  let report: Report = collect(start({ file: path.resolve(run.dir, test.rails), inputs: substitute(test.inputs ?? {}, vars), cwd, exec }));
   run.railsName = 'status' in report && 'rails' in report ? (report as { rails: string }).rails : '';
 
   for (let i = 0; report.status === 'step' && i < MAX_STEPS; i++) {
@@ -374,12 +404,8 @@ function driveRails(run: Run): Report {
       continue;
     }
     const { $files, $fail, ...output } = answer as { $files?: Record<string, string>; $fail?: string } & Record<string, unknown>;
-    for (const [rel, content] of Object.entries($files ?? {})) {
-      const target = path.resolve(cwd, rel);
-      fs.mkdirSync(path.dirname(target), { recursive: true });
-      fs.writeFileSync(target, content);
-    }
-    const next = done({ rails: run.railsName, id, output: $fail === undefined ? (Array.isArray(answer) ? answer : output) : undefined, fail: $fail, cwd });
+    writeFiles(cwd, $files);
+    const next = done({ rails: run.railsName, id, output: $fail === undefined ? (Array.isArray(answer) ? answer : output) : undefined, fail: $fail, cwd, exec });
     if (next.status === 'invalid') {
       failures.push(`the answer of step "${id}" is not valid: ${next.errors.join('; ')}`);
       break;

@@ -346,6 +346,7 @@ function runStep(state: State, step: RunStep, id: string, exec: Exec): void {
       dir: frame.dir,
       cwd: step['working-directory'] ? path.resolve(frameCwd(state), text(render(step['working-directory'], context))) : frameCwd(state),
       timeoutMs: commandTimeoutMs,
+      step: [...state.frames.filter((f) => f.kind === 'rails').map((f) => f.id as string), id].join('/'),
     });
     frame.results[id] = { outcome: result.outcome, exitCode: result.exitCode, outputs: result.outputs };
     state.notes.push(...result.warnings);

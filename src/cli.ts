@@ -20,11 +20,22 @@ export const PROTOCOL = [
   'Do not show the commands or their JSON to the user.',
 ].join('\n');
 
+/** The command of the next calls: SKILL_RAILS_COMMAND, else this build with node, which starts about 0.5 s faster than npx. */
+function selfCommand(): string {
+  if (process.env.SKILL_RAILS_COMMAND) return process.env.SKILL_RAILS_COMMAND;
+  try {
+    const bin = fs.realpathSync(process.argv[1] ?? '');
+    if (path.basename(bin) === 'skill-rails.js') return `node ${/^[\w./@+-]+$/.test(bin) ? bin : quote(bin)}`;
+  } catch {
+    // Not started from the bin file, for example from the API: use npx.
+  }
+  return `npx -y skill-rails@${RANGE}`;
+}
+
 /** The command that reports the step of a result, so that a skill needs no copy of the protocol. */
 export function withNext(result: Report): Report {
   if (result.status !== 'step') return result;
-  // SKILL_RAILS_COMMAND runs another build, for example a local checkout: node <checkout>/bin/skill-rails.js.
-  const base = `${process.env.SKILL_RAILS_COMMAND || `npx -y skill-rails@${RANGE}`} done ${result.rails} ${result.id}${result.cwd ? ` --cwd ${quote(result.cwd)}` : ''}`;
+  const base = `${selfCommand()} done ${result.rails} ${result.id}${result.cwd ? ` --cwd ${quote(result.cwd)}` : ''}`;
   const next = result.type !== 'wait' && result.output ? `${base} --output - <<'JSON'\n<the output, as JSON>\nJSON` : base;
   return { ...result, next };
 }

@@ -27,7 +27,7 @@ describe('bench', () => {
       'rails.yaml': yamlRails,
       'rails.ts': tsRails,
       'tests/greet.test.yaml': tests,
-      'bench.yaml': 'tests: tests\nruns: 3\nvariants:\n  yaml: {}\n  ts: { rails: rails.ts }\n  markdown: { markdown: true, agent: "echo hi > greeting.txt; echo \'{\\"num_turns\\": 4, \\"total_cost_usd\\": 0.1, \\"usage\\": {\\"input_tokens\\": 10, \\"output_tokens\\": 5}}\'" }\n',
+      'bench.yaml': 'tests: tests\nruns: 3\nvariants:\n  yaml: {}\n  ts: { rails: rails.ts }\n  markdown: { markdown: true, agent: "cat > /dev/null; echo hi > greeting.txt; echo \'{\\"num_turns\\": 4, \\"total_cost_usd\\": 0.1, \\"usage\\": {\\"input_tokens\\": 10, \\"output_tokens\\": 5}}\'" }\n',
     });
 
   it('runs the fixed-answer tests of each rails variant, and skips the Markdown variant', () => {
@@ -38,7 +38,7 @@ describe('bench', () => {
   });
 
   it('runs the agent tests with --live, and reads the agent metrics', () => {
-    const rows = bench(path.join(dir(), 'bench.yaml'), { live: true, runs: 1, agent: 'echo hi > greeting.txt' }).filter((row) => row.variant === 'markdown');
+    const rows = bench(path.join(dir(), 'bench.yaml'), { live: true, runs: 1, agent: 'cat > /dev/null; echo hi > greeting.txt' }).filter((row) => row.variant === 'markdown');
     expect(rows).toEqual([expect.objectContaining({ test: 'agent', passed: true, turns: 4, costUsd: 0.1, inputTokens: 10, outputTokens: 5 })]);
   });
 
