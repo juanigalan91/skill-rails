@@ -1,0 +1,15 @@
+name: questions
+description: Ask the questions that an agent step wrote, then write the answers.
+steps:
+  - id: investigate
+    prompt: Investigate, and write the open questions.
+    output:
+      questions: [{ question: string, header?: string, options?: [string], other?: boolean }]
+  - id: answers
+    if: ${{ steps.investigate.outputs.questions[0] }}
+    ask: ${{ steps.investigate.outputs.questions }}
+    max: 2
+    extra-options:
+      - { label: I don't know, description: Leave it out. }
+  - id: write
+    prompt: 'Write the result with these answers: ${{ toJSON(steps.answers.outputs) }}'

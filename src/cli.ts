@@ -2,6 +2,31 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { check, done, reset, start, status } from './api.js';
 import type { Report } from './types.js';
+import { RANGE } from './version.js';
+
+const quote = (value: string) => `'${value.replace(/'/g, "'\\''")}'`;
+
+/** How the agent acts on each result: the start report holds it, so that a skill needs no copy of it. */
+export const PROTOCOL = [
+  'Act on the status of each result.',
+  'step: do its instructions, or ask its questions with your question tool and wait for the answers; then run its next command, with your output as JSON when the command asks for it.',
+  'When a step has a directory, do the step in that folder.',
+  'A skill step: load the named skill with args first. An ask step: ask the questions as they are, never invent an answer, and report one property per question id. A wait step: wait until retryAt (Unix milliseconds), then run next.',
+  'If you cannot do a step, run its next command with --fail "<reason>" in place of the output.',
+  'invalid: correct the output and run the command again.',
+  'done: tell the user the message, and use the outputs.',
+  'failed or error: tell the user the message or the errors, and stop.',
+  'Tell the user each line of notes.',
+  'Do not show the commands or their JSON to the user.',
+].join('\n');
+
+/** The command that reports the step of a result, so that a skill needs no copy of the protocol. */
+export function withNext(result: Report): Report {
+  if (result.status !== 'step') return result;
+  const base = `npx -y skill-rails@${RANGE} done ${result.flow} ${result.id}${result.cwd ? ` --cwd ${quote(result.cwd)}` : ''}`;
+  const next = result.type !== 'wait' && result.output ? `${base} --output - <<'JSON'\n<the output, as JSON>\nJSON` : base;
+  return { ...result, next };
+}
 
 const USAGE = `Usage:
   skill-rails start <rails.yaml> [--input <key>=<value> ...]   check the flow, reset its state, print the first agent step
@@ -10,7 +35,10 @@ const USAGE = `Usage:
   skill-rails status <flow>                                   print the current step and the step results
   skill-rails reset <flow>                                    delete the state of a flow
   skill-rails check <rails.yaml>                               check a flow file without running it
-  skill-rails test [<file or folder> ...] [--json]            run the *.test.yaml flow tests (default: the current folder)
+  skill-rails test [<file or folder> ...] [--json]            run the *.test.yaml flow tests in these files and folders, and all folders below (default: the current folder); --quiet shows only the failures
+      [--live] [--agent <command>]                            --live also runs the tests with live steps, judge or mode: agent, with the agent command (default: SKILL_RAILS_AGENT, else claude -p)
+  skill-rails record <flow> [--out <file>]                    write a test file from the state of a run of the flow (default: stdout)
+  skill-rails trace <flow>                                    print one JSON line per agent step of the run: its request, answer and outcome
   skill-rails mcp                                             run the MCP server on stdio
   All commands accept --cwd <project-directory>.`;
 
@@ -88,22 +116,48 @@ export async function main(argv: string[], print = (value: Report) => process.st
         break;
       case 'check':
         if (!first) throw new Error(USAGE);
-        result = check({ file: file(first) });
+        result = check({ file: file(first), cwd });
         break;
       case 'test': {
         const { runTests } = await import('./testing.js');
+        const agent = option(args, 'agent');
+        const agentIndex = args.indexOf('--agent');
+        if (agentIndex !== -1) args.splice(agentIndex, 2);
         const targets = args.filter((arg) => !arg.startsWith('--'));
-        const results = runTests((targets.length ? targets : ['.']).map(file));
+        const results = runTests((targets.length ? targets : ['.']).map(file), { live: args.includes('--live'), agent });
         if (args.includes('--json')) process.stdout.write(`${JSON.stringify(results)}\n`);
         else {
           for (const r of results) {
-            process.stdout.write(`${r.passed ? '✓' : '✗'} ${r.name}  (${r.file}, ${r.trace.length} agent steps, ${r.ms} ms)\n`);
+            if ((r.passed || r.skipped) && args.includes('--quiet')) continue;
+            const mark = r.skipped ? '-' : r.passed ? '✓' : '✗';
+            const detail = r.skipped ? 'needs --live' : `${r.trace.length} agent steps, ${r.ms} ms`;
+            process.stdout.write(`${mark} ${r.name}  (${r.file}, ${detail})\n`);
             for (const failure of r.failures) process.stdout.write(`    ${failure}\n`);
           }
+          const skipped = results.filter((r) => r.skipped).length;
           const failed = results.filter((r) => !r.passed).length;
-          process.stdout.write(`\n${results.length - failed} passed, ${failed} failed\n`);
+          process.stdout.write(`\n${results.length - failed - skipped} passed, ${failed} failed${skipped ? `, ${skipped} skipped` : ''}\n`);
         }
         return results.length && results.every((r) => r.passed) ? 0 : 1;
+      }
+      case 'record': {
+        if (!first || first.startsWith('--')) throw new Error(USAGE);
+        const { record, RECORD_HEADER } = await import('./record.js');
+        const yaml = (await import('js-yaml')).default;
+        const out = option(args, 'out');
+        const text = `${RECORD_HEADER}\n${yaml.dump(record({ flow: first, cwd, out: out && file(out) }), { lineWidth: -1, noRefs: true })}`;
+        if (out) {
+          fs.mkdirSync(path.dirname(file(out)), { recursive: true });
+          fs.writeFileSync(file(out), text);
+        }
+        else process.stdout.write(text);
+        return 0;
+      }
+      case 'trace': {
+        if (!first || first.startsWith('--')) throw new Error(USAGE);
+        const { trace } = await import('./record.js');
+        for (const line of trace({ flow: first, cwd })) process.stdout.write(`${JSON.stringify(line)}\n`);
+        return 0;
       }
       case 'mcp': {
         const { serve } = await import('./mcp.js');
@@ -116,6 +170,6 @@ export async function main(argv: string[], print = (value: Report) => process.st
   } catch (error) {
     result = { status: 'error', errors: [(error as Error).message] };
   }
-  print(result);
+  print(command === 'start' && result.status !== 'error' ? { ...withNext(result), protocol: PROTOCOL } : withNext(result));
   return result.status === 'error' ? 2 : 0;
 }

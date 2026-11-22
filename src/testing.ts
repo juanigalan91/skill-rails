@@ -7,9 +7,25 @@ import yaml from 'js-yaml';
 import { done, start } from './api.js';
 import { readState } from './state.js';
 import { rootResults } from './engine.js';
-import type { Report, StepResult } from './types.js';
+import { loadFlow } from './flow.js';
+import type { PendingStep, Report, State, StepResult } from './types.js';
 
 const MAX_STEPS = 500;
+const agentTimeoutMinutes = () => Number(process.env.SKILL_RAILS_AGENT_TIMEOUT_MINUTES ?? 10);
+export const DEFAULT_AGENT = 'claude -p';
+
+/** Sends a prompt to a real agent, and returns what it printed. */
+export type Agent = (prompt: string, cwd: string, env: NodeJS.ProcessEnv) => string;
+
+export interface TestOptions {
+  /** Run the tests that need a real agent: live steps, judge and agent mode. Without it, they are skipped. */
+  live?: boolean;
+  /** The agent: a function, or a command that reads the prompt on stdin (default: SKILL_RAILS_AGENT, else `claude -p`). */
+  agent?: Agent | string;
+}
+
+/** A fixed answer, `live`, or `{ $live: <guidance> }` for a real agent. */
+type Answer = Record<string, unknown> | 'live';
 
 /** Expected value: a string that starts and ends with `/` is a regular expression. */
 type Matcher = string | number | boolean | null;
@@ -23,7 +39,7 @@ export interface TestCase {
   fixture?: string;
   /** Run `git init` and commit the fixture (default true). */
   git?: boolean;
-  /** Bash commands run in the working directory before the flow. */
+  /** Bash commands run in the working directory before the flow. `{{cwd}}` and `{{dir}}` work here too. */
   setup?: string;
   inputs?: Record<string, unknown>;
   env?: Record<string, string>;
@@ -32,16 +48,30 @@ export interface TestCase {
   /** `{{cwd}}` (the temp working directory) and `{{dir}}` (the folder of the test file) work in env, inputs and answers. */
   /**
    * The agent output of each step, by step id. `$files` writes files first; `$fail` fails the step.
-   * A list gives one answer per occurrence of the step, in order (a step in a foreach comes back once per item).
+   * A list gives one answer per occurrence of the step, in order (a step in a foreach or a repeat comes back once per iteration).
    */
-  answers?: Record<string, Record<string, unknown> | Array<Record<string, unknown>>>;
+  answers?: Record<string, Answer | Answer[]>;
+  /** agent: the agent command does the request, and the expectations read the saved state of the flow. */
+  mode?: 'agent';
+  request?: string;
+  /** Run the test this number of times; every run must pass. */
+  'judge-runs'?: number;
   expect?: {
     status?: 'done' | 'failed' | 'error';
     message?: Matcher;
     steps?: Record<string, StepResult['outcome']>;
+    /** `<step id>.<key>`: an output of a step; a deeper path reads inside it, for example `fix.results[0].steps`. */
     outputs?: Record<string, Matcher>;
+    /** `<key>`: an output that the flow gives back (its `outputs:`), at the end. */
+    'flow-outputs'?: Record<string, Matcher>;
     files?: Record<string, Matcher>;
     notes?: Matcher[];
+    /** `<step id>` or `<uses id>/<step id>`: a rubric that a real agent grades the step output against. */
+    judge?: Record<string, string>;
+    /** Whether the flow has a state: false means that the agent did not run the flow. */
+    started?: boolean;
+    /** The stdout of the agent, in agent mode: a string is a part of it. */
+    transcript?: { contains?: Matcher[]; absent?: Matcher[] };
   };
 }
 
@@ -53,9 +83,20 @@ export interface TestResult {
   /** The ids of the agent steps, in order. */
   trace: string[];
   ms: number;
+  /** The test needs a real agent, and the run has no --live. */
+  skipped?: boolean;
 }
 
 const isRegex = (value: unknown): value is string => typeof value === 'string' && value.length > 1 && value.startsWith('/') && value.endsWith('/');
+
+/** A value at a path such as `a.b[0].c`; an exact key wins over a path. */
+function at(value: unknown, key: string): unknown {
+  if (value && typeof value === 'object' && Object.hasOwn(value, key)) return (value as Record<string, unknown>)[key];
+  return key
+    .split(/\.|\[(\d+)\]/)
+    .filter(Boolean)
+    .reduce<unknown>((current, part) => (current && typeof current === 'object' ? (current as Record<string, unknown>)[part] : undefined), value);
+}
 
 function matches(expected: Matcher, actual: unknown): boolean {
   if (isRegex(expected)) return new RegExp(expected.slice(1, -1)).test(typeof actual === 'string' ? actual : JSON.stringify(actual));
@@ -96,7 +137,7 @@ export function findTests(targets: string[]): string[] {
     if (stat.isFile()) found.push(target);
     else
       for (const entry of fs.readdirSync(target, { withFileTypes: true })) {
-        if (entry.name === 'node_modules' || entry.name === '.git') continue;
+        if (['node_modules', '.git', 'dist', 'coverage', '.nx'].includes(entry.name)) continue;
         const child = path.join(target, entry.name);
         if (entry.isDirectory()) walk(child);
         else if (entry.name.endsWith('.test.yaml') || entry.name.endsWith('.test.yml')) found.push(child);
@@ -131,115 +172,331 @@ function prepare(test: TestCase, dir: string, cwd: string): void {
     git('commit', '-q', '--allow-empty', '-m', 'fixture');
   }
   if (test.setup) {
-    const result = spawnSync('bash', ['-eo', 'pipefail', '-c', test.setup], { cwd, encoding: 'utf8', env: process.env });
+    const setup = substitute(test.setup, { cwd, dir: path.dirname(path.resolve(test.file)) });
+    const result = spawnSync('bash', ['-eo', 'pipefail', '-c', setup], { cwd, encoding: 'utf8', env: process.env });
     if (result.status !== 0) throw new Error(`setup failed: ${result.stderr || result.stdout}`);
   }
 }
 
-export function runTest(test: TestCase): TestResult {
+/** The answer of a step: `<uses id>/<step id>` for a step of another flow (the longest path first), else the step id. */
+function answerKey(answers: Record<string, unknown>, id: string, flow: string, cwd: string): string {
+  let scope: string[] = [];
+  try {
+    scope = readState(flow, cwd).frames.filter((frame) => frame.kind === 'flow').map((frame) => frame.id as string);
+  } catch {
+    return id;
+  }
+  for (let i = 0; i < scope.length; i++) {
+    const key = [...scope.slice(i), id].join('/');
+    if (key in answers) return key;
+  }
+  return id;
+}
+
+/** The guidance of a live answer (`live` or `{ $live }`), or undefined for a fixed answer. */
+function liveGuidance(answer: unknown): string | undefined {
+  if (answer === 'live') return '';
+  if (answer && typeof answer === 'object' && Object.hasOwn(answer, '$live')) return String((answer as { $live: unknown }).$live ?? '');
+  return undefined;
+}
+
+/** Whether a test needs a real agent: a live answer, a judge, or agent mode. */
+export function needsAgent(test: TestCase): boolean {
+  const answers = Object.values(test.answers ?? {}).flat();
+  return test.mode === 'agent' || Object.keys(test.expect?.judge ?? {}).length > 0 || answers.some((answer) => liveGuidance(answer) !== undefined);
+}
+
+/** An agent that runs a command, with the prompt on stdin. */
+export function commandAgent(command: string): Agent {
+  return (prompt, cwd, env) => {
+    const result = spawnSync('bash', ['-c', command], { input: prompt, cwd, env, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, timeout: agentTimeoutMinutes() * 60_000 });
+    if (result.signal === 'SIGTERM') throw new Error(`the agent command did not end in ${agentTimeoutMinutes()} minutes (SKILL_RAILS_AGENT_TIMEOUT_MINUTES)`);
+    if (result.error) throw new Error(`the agent command failed: ${result.error.message}`);
+    if (result.status !== 0) {
+      const last = (result.stderr || result.stdout).trim().split('\n').slice(-5).join('\n');
+      throw new Error(`the agent command failed with exit code ${result.status}: ${last}`);
+    }
+    return result.stdout;
+  };
+}
+
+const agentOf = (agent: TestOptions['agent']): Agent =>
+  typeof agent === 'function' ? agent : commandAgent(agent ?? process.env.SKILL_RAILS_AGENT ?? DEFAULT_AGENT);
+
+/** The index of the bracket that closes the JSON value at `start`, or -1. */
+function valueEnd(text: string, start: number): number {
+  let depth = 0;
+  let inString = false;
+  for (let i = start; i < text.length; i++) {
+    const char = text[i];
+    if (inString) {
+      if (char === '\\') i++;
+      else if (char === '"') inString = false;
+    } else if (char === '"') inString = true;
+    else if (char === '{' || char === '[') depth++;
+    else if (char === '}' || char === ']') {
+      depth--;
+      if (depth === 0) return i;
+    }
+  }
+  return -1;
+}
+
+/** The last JSON object or list in a text, also inside a ```json fence. */
+export function lastJson(text: string): unknown {
+  let found: { value: unknown } | undefined;
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] !== '{' && text[i] !== '[') continue;
+    const end = valueEnd(text, i);
+    if (end === -1) continue;
+    try {
+      found = { value: JSON.parse(text.slice(i, end + 1)) };
+      i = end;
+    } catch {
+      // Not JSON, for example `{x}` in a sentence: try the next bracket.
+    }
+  }
+  if (!found) throw new Error('the reply holds no JSON object or list');
+  return found.value;
+}
+
+const SCHEMA_LINE = 'Reply with one JSON value that matches this JSON schema, and nothing else:';
+
+/** The prompt of a live step: what the agent of a real run would read. */
+export function stepPrompt(step: PendingStep, guidance = ''): string {
+  const parts: string[] = [];
+  if (step.type === 'ask') parts.push('You play the user of a flow. Answer these questions as the user would:', JSON.stringify(step.questions, null, 2));
+  if (step.type === 'skill') parts.push(`Load the skill "${step.skill}"${step.args ? ` with these args: ${step.args}` : ''}, and do it.`);
+  if (step.instructions) parts.push(step.instructions);
+  if (step.directory) parts.push(`Do the step in this folder: ${step.directory}`);
+  if (guidance) parts.push(guidance);
+  parts.push(`${SCHEMA_LINE}\n${JSON.stringify(step.output ?? {})}`);
+  return parts.join('\n\n');
+}
+
+/** The prompt that grades a step output against a rubric. */
+export function judgePrompt(id: string, rubric: string, output: unknown): string {
+  return [
+    `Grade the output of the step "${id}" of a flow against this rubric.`,
+    `Rubric:\n${rubric}`,
+    `Output (JSON):\n${JSON.stringify(output, null, 2)}`,
+    `${SCHEMA_LINE}\n{"type":"object","required":["pass","reason"],"properties":{"pass":{"type":"boolean"},"reason":{"type":"string"}}}`,
+  ].join('\n\n');
+}
+
+/** One run of a test. */
+interface Run {
+  test: TestCase;
+  dir: string;
+  cwd: string;
+  agent: Agent;
+  flowName: string;
+  failures: string[];
+  trace: string[];
+  notes: string[];
+  /** Agent mode: the stdout of the agent. */
+  transcript?: string;
+}
+
+function stateOf(run: Run): State | undefined {
+  try {
+    return readState(run.flowName, run.cwd);
+  } catch {
+    return undefined;
+  }
+}
+
+/** Sends a step to the agent and reports its output; retries once when the output is not valid. */
+function liveStep(step: PendingStep, guidance: string, run: Run): Report {
+  const base = stepPrompt(step, guidance);
+  let errors: string[] = [];
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const reply = run.agent(errors.length ? `${base}\n\nYour last reply was not valid: ${errors.join('; ')}` : base, run.cwd, process.env);
+    let output: unknown;
+    try {
+      output = lastJson(reply);
+    } catch (error) {
+      errors = [(error as Error).message];
+      continue;
+    }
+    const next = done({ flow: run.flowName, id: step.id, output, cwd: run.cwd });
+    if (next.status !== 'invalid') return next;
+    errors = next.errors;
+  }
+  throw new Error(`live step "${step.id}": the reply is not valid: ${errors.join('; ')}`);
+}
+
+/** Drives the flow with the answers of the test. Returns the last report. */
+function driveFlow(run: Run): Report {
+  const { test, cwd, failures, trace } = run;
+  const vars = { cwd, dir: run.dir };
+  const answers = substitute(test.answers ?? {}, vars);
+  const used = new Map<string, number>();
+  const collect = (r: Report): Report => {
+    if ('notes' in r && r.notes) run.notes.push(...r.notes);
+    return r;
+  };
+  let report: Report = collect(start({ file: path.resolve(run.dir, test.flow), inputs: substitute(test.inputs ?? {}, vars), cwd }));
+  run.flowName = 'status' in report && 'flow' in report ? (report as { flow: string }).flow : '';
+
+  for (let i = 0; report.status === 'step' && i < MAX_STEPS; i++) {
+    const id = report.id;
+    trace.push(id);
+    const key = answerKey(answers, id, run.flowName, cwd);
+    const given = answers[key];
+    const count = used.get(key) ?? 0;
+    const answer = Array.isArray(given) ? given[count] : given;
+    if (!answer) {
+      failures.push(
+        given
+          ? `the flow asked for step "${id}" a ${count + 1}th time, and the test has ${count} answers for it`
+          : `the flow asked for step "${id}" (${report.type}), and the test has no answer for it`,
+      );
+      break;
+    }
+    used.set(key, count + 1);
+    const guidance = liveGuidance(answer);
+    if (guidance !== undefined) {
+      try {
+        report = collect(liveStep(report, guidance, run));
+      } catch (error) {
+        failures.push((error as Error).message);
+        break;
+      }
+      continue;
+    }
+    const { $files, $fail, ...output } = answer as { $files?: Record<string, string>; $fail?: string } & Record<string, unknown>;
+    for (const [rel, content] of Object.entries($files ?? {})) {
+      const target = path.resolve(cwd, rel);
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      fs.writeFileSync(target, content);
+    }
+    const next = done({ flow: run.flowName, id, output: $fail === undefined ? (Array.isArray(answer) ? answer : output) : undefined, fail: $fail, cwd });
+    if (next.status === 'invalid') {
+      failures.push(`the answer of step "${id}" is not valid: ${next.errors.join('; ')}`);
+      break;
+    }
+    report = collect(next);
+  }
+  if (report.status === 'error') {
+    // An expected error is checked with the other expectations: its errors become the message.
+    if (test.expect?.status === 'error') report = { status: 'error', errors: report.errors, message: report.errors.join('\n') } as Report;
+    else failures.push(`the flow has errors: ${report.errors.join('; ')}`);
+  }
+  for (const [id, given] of Object.entries(answers)) {
+    if (failures.length) break;
+    const count = used.get(id) ?? 0;
+    if (!count) failures.push(`the flow never asked for step "${id}"`);
+    else if (Array.isArray(given) && count < given.length) failures.push(`the flow asked for step "${id}" ${count} times, and the test has ${given.length} answers for it`);
+  }
+  run.flowName ||= (report as { flow?: string }).flow ?? '';
+  return report;
+}
+
+/** Agent mode: the agent does the request; the report comes from the saved state of the flow (null when it has none). */
+function driveAgent(run: Run): Report | null {
+  if (!run.test.request) throw new Error('a test with mode: agent needs a request');
+  run.flowName = loadFlow(path.resolve(run.dir, run.test.flow), { cwd: run.cwd }).name;
+  run.transcript = run.agent(substitute(run.test.request, { cwd: run.cwd, dir: run.dir }), run.cwd, process.env);
+  const state = stateOf(run);
+  if (!state) return null;
+  return { status: state.status, flow: state.flow.name, message: state.message, ...(state.outputs ? { outputs: state.outputs } : {}) };
+}
+
+/** The result of `<step id>` or `<uses id>/<step id>`. */
+function stepAt(steps: Record<string, StepResult>, id: string): StepResult | undefined {
+  const parts = id.split('/');
+  let results: Record<string, StepResult> | undefined = steps;
+  for (const part of parts.slice(0, -1)) results = results?.[part]?.outputs?.steps as Record<string, StepResult> | undefined;
+  return results?.[parts.at(-1) as string];
+}
+
+const contains = (expected: Matcher, text: string): boolean => (isRegex(expected) ? matches(expected, text) : text.includes(String(expected)));
+
+function judge(run: Run, steps: Record<string, StepResult>, id: string, rubric: string): string | null {
+  const result = stepAt(steps, id);
+  if (!result) return `judge ${id}: the step has no result`;
+  let verdict: { pass?: unknown; reason?: unknown };
+  try {
+    verdict = lastJson(run.agent(judgePrompt(id, rubric, result.outputs ?? null), run.cwd, process.env)) as typeof verdict;
+  } catch (error) {
+    return `judge ${id}: ${(error as Error).message}`;
+  }
+  if (typeof verdict?.pass !== 'boolean') return `judge ${id}: the reply has no boolean "pass": ${JSON.stringify(verdict)}`;
+  return verdict.pass ? null : `judge ${id}: ${String(verdict.reason ?? 'no reason')}`;
+}
+
+function checkExpectations(run: Run, report: Report | null): void {
+  const { failures, cwd } = run;
+  const expect = run.test.expect ?? {};
+  const status = report?.status ?? 'not started';
+  if (expect.status && status !== expect.status) failures.push(`status: expected ${expect.status}, got ${status}`);
+  const message = report && 'message' in report ? report.message : null;
+  if (expect.message !== undefined && !matches(expect.message, message)) failures.push(`message: expected ${JSON.stringify(expect.message)}, got ${JSON.stringify(message)}`);
+  const state = stateOf(run);
+  if (expect.started !== undefined && Boolean(state) !== expect.started) failures.push(`started: expected ${expect.started}, got ${Boolean(state)}`);
+  const steps = state ? rootResults(state) : {};
+  for (const [id, outcome] of Object.entries(expect.steps ?? {})) {
+    const actual = stepAt(steps, id)?.outcome ?? 'not reached';
+    if (actual !== outcome) failures.push(`step "${id}": expected ${outcome}, got ${actual}`);
+  }
+  for (const [key, expected] of Object.entries(expect.outputs ?? {})) {
+    const [id, ...rest] = key.split('.');
+    const actual = at(steps[id ?? '']?.outputs, rest.join('.'));
+    if (!matches(expected, actual ?? null)) failures.push(`output ${key}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual ?? null)}`);
+  }
+  const returned = report && 'outputs' in report ? report.outputs : undefined;
+  for (const [key, expected] of Object.entries(expect['flow-outputs'] ?? {})) {
+    const actual = at(returned, key);
+    if (!matches(expected, actual ?? null)) failures.push(`flow output ${key}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual ?? null)}`);
+  }
+  for (const expected of expect.notes ?? []) {
+    if (!run.notes.some((note) => matches(expected, note))) failures.push(`notes: no note matches ${JSON.stringify(expected)} (got ${JSON.stringify(run.notes)})`);
+  }
+  for (const [rel, expected] of Object.entries(expect.files ?? {})) {
+    const target = path.resolve(cwd, rel);
+    const exists = fs.existsSync(target);
+    if (expected === 'exists' || expected === 'absent') {
+      if (exists !== (expected === 'exists')) failures.push(`file ${rel}: expected ${expected}`);
+    } else if (!exists) failures.push(`file ${rel}: expected it to exist`);
+    else if (!matches(expected, fs.readFileSync(target, 'utf8'))) failures.push(`file ${rel}: the content does not match ${JSON.stringify(expected)}`);
+  }
+  const transcript = run.transcript ?? '';
+  for (const expected of expect.transcript?.contains ?? []) {
+    if (!contains(expected, transcript)) failures.push(`transcript: does not contain ${JSON.stringify(expected)}`);
+  }
+  for (const expected of expect.transcript?.absent ?? []) {
+    if (contains(expected, transcript)) failures.push(`transcript: contains ${JSON.stringify(expected)}`);
+  }
+  for (const [id, rubric] of Object.entries(expect.judge ?? {})) {
+    const failure = judge(run, steps, id, rubric);
+    if (failure) failures.push(failure);
+  }
+}
+
+function runOnce(test: TestCase, agent: Agent): TestResult {
   const began = Date.now();
   const dir = path.dirname(path.resolve(test.file));
-  const failures: string[] = [];
-  const trace: string[] = [];
-  const result = (passed = failures.length === 0): TestResult => ({ name: test.name, file: test.file, passed, failures, trace, ms: Date.now() - began });
+  const run: Run = { test, dir, cwd: '', agent, flowName: '', failures: [], trace: [], notes: [] };
+  const result = (): TestResult => ({ name: test.name, file: test.file, passed: run.failures.length === 0, failures: run.failures, trace: run.trace, ms: Date.now() - began });
 
   const stateDir = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-rails-state-'));
   const cwd = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'skill-rails-run-')));
-  const vars = { cwd, dir };
+  run.cwd = cwd;
   const pathPrefix = (test.path ?? []).map((p) => path.resolve(dir, p)).join(path.delimiter);
   const env = {
-    ...substitute(test.env ?? {}, vars),
+    ...substitute(test.env ?? {}, { cwd, dir }),
     SKILL_RAILS_STATE_DIR: stateDir,
-    ...(pathPrefix ? { PATH: `${pathPrefix}${path.delimiter}${process.env.PATH ?? ''}` } : {}),
+    ...(pathPrefix ? { PATH: `${pathPrefix}${path.delimiter}${process.env.PATH ?? ''}`, SKILL_RAILS_STUB_PATH: pathPrefix } : {}),
   };
 
   return withEnv(env, () => {
     try {
       prepare(test, dir, cwd);
+      const report = test.mode === 'agent' ? driveAgent(run) : driveFlow(run);
+      if (run.failures.length === 0) checkExpectations(run, report);
     } catch (error) {
-      failures.push((error as Error).message);
-      return result();
-    }
-    const answers = substitute(test.answers ?? {}, vars);
-    const used = new Map<string, number>();
-    const flowFile = path.resolve(dir, test.flow);
-    const notes: string[] = [];
-    const collect = (r: Report): Report => {
-      if ('notes' in r && r.notes) notes.push(...r.notes);
-      return r;
-    };
-    let report: Report = collect(start({ file: flowFile, inputs: substitute(test.inputs ?? {}, vars), cwd }));
-    let flowName = 'status' in report && 'flow' in report ? (report as { flow: string }).flow : '';
-
-    for (let i = 0; report.status === 'step' && i < MAX_STEPS; i++) {
-      const id = report.id;
-      trace.push(id);
-      const given = answers[id];
-      const count = used.get(id) ?? 0;
-      const answer = Array.isArray(given) ? given[count] : given;
-      if (!answer) {
-        failures.push(
-          given
-            ? `the flow asked for step "${id}" a ${count + 1}th time, and the test has ${count} answers for it`
-            : `the flow asked for step "${id}" (${report.type}), and the test has no answer for it`,
-        );
-        break;
-      }
-      used.set(id, count + 1);
-      const { $files, $fail, ...output } = answer as { $files?: Record<string, string>; $fail?: string } & Record<string, unknown>;
-      for (const [rel, content] of Object.entries($files ?? {})) {
-        const target = path.resolve(cwd, rel);
-        fs.mkdirSync(path.dirname(target), { recursive: true });
-        fs.writeFileSync(target, content);
-      }
-      const next = done({ flow: flowName, id, output: $fail === undefined ? output : undefined, fail: $fail, cwd });
-      if (next.status === 'invalid') {
-        failures.push(`the answer of step "${id}" is not valid: ${next.errors.join('; ')}`);
-        break;
-      }
-      report = collect(next);
-    }
-    if (report.status === 'error') failures.push(`the flow has errors: ${report.errors.join('; ')}`);
-    for (const [id, given] of Object.entries(answers)) {
-      if (failures.length) break;
-      const count = used.get(id) ?? 0;
-      if (!count) failures.push(`the flow never asked for step "${id}"`);
-      else if (Array.isArray(given) && count < given.length) failures.push(`the flow asked for step "${id}" ${count} times, and the test has ${given.length} answers for it`);
-    }
-
-    const expect = test.expect ?? {};
-    const status = report.status;
-    if (failures.length === 0) {
-      if (expect.status && status !== expect.status) failures.push(`status: expected ${expect.status}, got ${status}`);
-      const message = 'message' in report ? report.message : null;
-      if (expect.message !== undefined && !matches(expect.message, message)) failures.push(`message: expected ${JSON.stringify(expect.message)}, got ${JSON.stringify(message)}`);
-      let steps: Record<string, StepResult> = {};
-      try {
-        flowName ||= (report as { flow?: string }).flow ?? '';
-        steps = rootResults(readState(flowName, cwd));
-      } catch {
-        // the flow has no state: a flow file error
-      }
-      for (const [id, outcome] of Object.entries(expect.steps ?? {})) {
-        const actual = steps[id]?.outcome ?? 'not reached';
-        if (actual !== outcome) failures.push(`step "${id}": expected ${outcome}, got ${actual}`);
-      }
-      for (const [key, expected] of Object.entries(expect.outputs ?? {})) {
-        const [id, ...rest] = key.split('.');
-        const actual = steps[id ?? '']?.outputs?.[rest.join('.')];
-        if (!matches(expected, actual ?? null)) failures.push(`output ${key}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual ?? null)}`);
-      }
-      for (const expected of expect.notes ?? []) {
-        if (!notes.some((note) => matches(expected, note))) failures.push(`notes: no note matches ${JSON.stringify(expected)} (got ${JSON.stringify(notes)})`);
-      }
-      for (const [rel, expected] of Object.entries(expect.files ?? {})) {
-        const target = path.resolve(cwd, rel);
-        const exists = fs.existsSync(target);
-        if (expected === 'exists' || expected === 'absent') {
-          if (exists !== (expected === 'exists')) failures.push(`file ${rel}: expected ${expected}`);
-        } else if (!exists) failures.push(`file ${rel}: expected it to exist`);
-        else if (!matches(expected, fs.readFileSync(target, 'utf8'))) failures.push(`file ${rel}: the content does not match ${JSON.stringify(expected)}`);
-      }
+      run.failures.push((error as Error).message);
     }
     fs.rmSync(cwd, { recursive: true, force: true });
     fs.rmSync(stateDir, { recursive: true, force: true });
@@ -247,11 +504,28 @@ export function runTest(test: TestCase): TestResult {
   });
 }
 
+/** Runs a test; a test that needs a real agent is skipped without `live`. With `judge-runs`, every run must pass. */
+export function runTest(test: TestCase, options: TestOptions = {}): TestResult {
+  if (needsAgent(test) && !options.live) return { name: test.name, file: test.file, passed: true, skipped: true, failures: [], trace: [], ms: 0 };
+  const agent = agentOf(options.agent);
+  const runs = Math.max(1, test['judge-runs'] ?? 1);
+  let passed = 0;
+  let failed: TestResult | undefined;
+  let last: TestResult | undefined;
+  for (let i = 0; i < runs; i++) {
+    last = runOnce(test, agent);
+    if (last.passed) passed++;
+    else failed ??= last;
+  }
+  if (!failed) return last as TestResult;
+  return runs > 1 ? { ...failed, failures: [...failed.failures, `passed ${passed} of ${runs} runs`] } : failed;
+}
+
 /** Runs the tests of the given files and folders. */
-export function runTests(targets: string[]): TestResult[] {
+export function runTests(targets: string[], options: TestOptions = {}): TestResult[] {
   return findTests(targets).flatMap((file) => {
     try {
-      return loadTests(file).map(runTest);
+      return loadTests(file).map((test) => runTest(test, options));
     } catch (error) {
       return [{ name: path.basename(file), file, passed: false, failures: [(error as Error).message], trace: [], ms: 0 }];
     }

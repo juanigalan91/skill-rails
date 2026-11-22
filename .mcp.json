@@ -2,7 +2,7 @@
   "mcpServers": {
     "skill-rails": {
       "command": "npx",
-      "args": ["-y", "skill-rails@0.2", "mcp"]
+      "args": ["-y", "skill-rails@0.3", "mcp"]
     }
   }
 }

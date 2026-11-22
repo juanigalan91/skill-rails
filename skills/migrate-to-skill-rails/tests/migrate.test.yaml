@@ -19,6 +19,7 @@ inputs:
 tests:
   - name: migrates the existing skill without sibling copies or backups
     answers:
+      assess: { verdict: migrate, reasons: [It runs git and gh commands.] }
       audit:
         brief: Migrate the existing sample skill in place.
         rules:
@@ -87,6 +88,7 @@ tests:
       source: '{{cwd}}/skill/SKILL.md'
       auto: true
     answers:
+      assess: { verdict: migrate, reasons: [It runs git and gh commands.] }
       audit:
         brief: Migrate the existing sample skill in place.
         rules:
@@ -144,6 +146,7 @@ tests:
       source: '{{cwd}}/skill'
       auto: false
     answers:
+      assess: { verdict: migrate, reasons: [It runs git and gh commands.] }
       audit:
         brief: Migrate the existing sample skill in place.
         rules:
@@ -198,6 +201,7 @@ tests:
         skill/RULES.md: absent
   - name: does not replace the wrapper before the audit completes
     answers:
+      assess: { verdict: migrate, reasons: [It runs git and gh commands.] }
       audit:
         $fail: Cannot read a required reference.
     expect:
@@ -219,6 +223,7 @@ tests:
         create: not reached
   - name: keeps the current wrapper readable until authoring
     answers:
+      assess: { verdict: migrate, reasons: [It runs git and gh commands.] }
       audit:
         brief: Migrate the existing sample skill in place.
         rules:
@@ -255,6 +260,7 @@ tests:
           keep existing script
   - name: repairs invalid YAML in the same directory
     answers:
+      assess: { verdict: migrate, reasons: [It runs git and gh commands.] }
       audit:
         brief: Migrate the existing sample skill in place.
         rules:
@@ -314,6 +320,7 @@ tests:
         skill/RULES.md: absent
   - name: stops on unresolved validation errors without restoring a backup
     answers:
+      assess: { verdict: migrate, reasons: [It runs git and gh commands.] }
       audit:
         brief: Migrate the existing sample skill in place.
         rules:
@@ -365,7 +372,7 @@ tests:
     expect:
       status: failed
       steps:
-        audit: not reached
+        assess: not reached
       files:
         skill-flow: absent
         skill/SKILL.md.bak: absent
@@ -378,10 +385,64 @@ tests:
     expect:
       status: failed
       steps:
-        audit: not reached
+        assess: not reached
       files:
         skill-flow: absent
         skill/SKILL.md.bak: absent
         skill/SKILL.original.md: absent
         skill/backup: absent
         skill/RULES.md: absent
+  - name: keeps a skill as Markdown when the assessment says so, unattended
+    answers:
+      assess: { verdict: keep, reasons: [CI reads the SKILL.md text.] }
+    expect:
+      status: done
+      message: '/Kept as Markdown, with no change: CI reads the SKILL.md text/'
+      steps:
+        audit: not reached
+      files:
+        skill/SKILL.md: |
+          ---
+          name: sample
+          description: A sample skill.
+          ---
+          Report migrated safely.
+  - name: the user can keep the skill as Markdown
+    inputs:
+      source: '{{cwd}}/skill'
+      auto: false
+    answers:
+      assess: { verdict: keep, reasons: [It is one command.] }
+      confirm: { choice: Keep it as Markdown (Recommended) }
+    expect:
+      status: done
+      message: /Kept as Markdown/
+      steps:
+        audit: not reached
+  - name: the user can migrate anyway
+    inputs:
+      source: '{{cwd}}/skill'
+      auto: false
+    answers:
+      assess: { verdict: keep, reasons: [It is one command.] }
+      confirm: { choice: Migrate anyway }
+      audit:
+        $fail: Stop here.
+    expect:
+      status: failed
+      message: Stop here.
+  - name: lists the files outside the skill that name its files
+    setup: |-
+      git init -q repo && mkdir -p repo/skills/sample repo/ci
+      printf -- '---\nname: sample\ndescription: x\n---\nDo it.\n' > repo/skills/sample/SKILL.md
+      printf 'cat skills/sample/SKILL.md\n' > repo/ci/run.sh
+      git -C repo add -A
+    inputs:
+      source: '{{cwd}}/repo/skills/sample'
+      auto: true
+    answers:
+      assess: { verdict: keep, reasons: [ci/run.sh reads it.] }
+    expect:
+      status: done
+      outputs:
+        readers.readers: [ci/run.sh]

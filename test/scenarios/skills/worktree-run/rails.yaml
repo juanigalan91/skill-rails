@@ -1,0 +1,17 @@
+name: worktree-run
+description: Run a skill of the plugin in another folder, and pass on the stop of a sub-flow.
+inputs:
+  dir: { default: work }
+steps:
+  - run: mkdir -p "$DIR"
+    env: { DIR: '${{ inputs.dir }}' }
+  - id: info
+    uses: skill:demo-plugin:repo-info
+    working-directory: ${{ inputs.dir }}
+  - id: tidy
+    prompt: Tidy the files.
+    working-directory: ${{ inputs.dir }}
+  - id: gate
+    uses: gate.yaml
+    forward-stop: true
+  - stop: 'Done in ${{ steps.info.outputs.DIR }}'

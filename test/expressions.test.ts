@@ -8,6 +8,7 @@ const context: Context = {
   env: {},
   flow: { name: 'test', dir: '/tmp' },
   item: null,
+  failure: null,
   loop: null,
 };
 

@@ -60,7 +60,7 @@ steps:
       TEMPLATE: ${{ steps.context.outputs.template }}
 
   - id: text
-    prompt-file: prompts/text.md
+    prompt: prompts/text.md
     output:
       type: object
       required: [title]

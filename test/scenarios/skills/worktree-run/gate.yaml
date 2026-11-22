@@ -1,0 +1,7 @@
+name: gate
+steps:
+  - id: ready
+    ask:
+      - { id: go, header: Ready, question: Finish now?, options: [Finish, Not now] }
+  - if: ${{ steps.ready.outputs.go == 'Not now' }}
+    stop: Not finished.

@@ -1,0 +1,20 @@
+flow: ../rails.yaml
+git: false
+tests:
+  - name: one issue fixed on the second attempt, one skipped, and a tally with typed numbers
+    answers:
+      find: { issues: [{ file: a.txt, summary: typo }, { file: b.txt, summary: link }] }
+      edit:
+        - {}
+        - { $files: { a.txt: fixed } }
+        - {}
+      decide: [{ answer: Try again }, { answer: Skip it }]
+    expect:
+      status: done
+      flow-outputs: { fixed: 1, total: 2 }
+      notes: ['Fixed 1 of 2 issues.']
+  - name: no issue stops early
+    answers:
+      find: { issues: [] }
+    expect:
+      message: No issue.

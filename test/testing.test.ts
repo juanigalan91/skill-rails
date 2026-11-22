@@ -116,3 +116,70 @@ expect:
     expect(fs.existsSync(path.join(dir, 'fixture', 'extra.txt'))).toBe(false);
   });
 });
+
+describe('the expectations of 0.3', () => {
+  const runFlow = (flow: string, test: string, files: Record<string, string> = {}) => {
+    const dir = tempDir({ 'rails.yaml': flow, 'tests/t.test.yaml': test, ...files });
+    const [first] = loadTests(path.join(dir, 'tests', 't.test.yaml'));
+    return runTest(first!);
+  };
+  const OUT = "name: o\noutputs:\n  list: ${{ steps.a.outputs.value }}\n  n: 2\nsteps:\n  - id: a\n    run: echo '[{\"k\":\"x\"}]'\n    stdout: json\n";
+
+  it('checks the flow outputs and the longer paths of step outputs', () => {
+    expect(runFlow(OUT, "flow: ../rails.yaml\ngit: false\nexpect:\n  flow-outputs: { n: 2, 'list[0].k': x }\n  outputs: { 'a.value[0].k': x }\n")).toMatchObject({ passed: true });
+    expect(runFlow(OUT, "flow: ../rails.yaml\ngit: false\nexpect:\n  flow-outputs: { n: 3 }\n")).toMatchObject({ passed: false, failures: ['flow output n: expected 3, got 2'] });
+  });
+
+  it('gives {{dir}} and {{cwd}} to the setup', () => {
+    const flow = 'name: s\nsteps:\n  - run: test -f copied.txt\n';
+    const test = "flow: ../rails.yaml\ngit: false\nsetup: cp '{{dir}}/source.txt' '{{cwd}}/copied.txt'\nexpect:\n  status: done\n";
+    expect(runFlow(flow, test, { 'tests/source.txt': 'x' })).toMatchObject({ passed: true });
+  });
+
+  it('can expect an error of the flow', () => {
+    const flow = 'name: e\ninputs:\n  x: { required: true }\nsteps:\n  - stop: s\n';
+    expect(runFlow(flow, "flow: ../rails.yaml\ngit: false\nexpect:\n  status: error\n  message: '/input \"x\" is required/'\n")).toMatchObject({ passed: true });
+    expect(runFlow(flow, 'flow: ../rails.yaml\ngit: false\nexpect:\n  status: done\n')).toMatchObject({ passed: false });
+  });
+});
+
+describe('runTest stubs and scoped answers', () => {
+  it('puts the test path before the scripts folder, and keys answers by uses step', () => {
+    const dir = tempDir({
+      'rails.yaml': `name: outer
+steps:
+  - id: tool
+    run: tool.sh
+    stdout: text
+  - id: a
+    uses: inner.yaml
+  - id: b
+    uses: inner.yaml
+  - stop: '\${{ steps.tool.outputs.value }} \${{ steps.a.outputs.steps.ask.outputs.v }}\${{ steps.b.outputs.steps.ask.outputs.v }}'
+`,
+      'inner.yaml': `name: inner
+steps:
+  - id: ask
+    prompt: Ask.
+    output: { type: object }
+`,
+      'scripts/tool.sh': '#!/bin/sh\necho real\n',
+      'tests/stubs/tool.sh': '#!/bin/sh\necho stub\n',
+      'tests/t.test.yaml': `flow: ../rails.yaml
+git: false
+path: [stubs]
+answers:
+  a/ask: { v: 1 }
+  b/ask: { v: 2 }
+expect:
+  status: done
+  message: stub 12
+  steps: { a/ask: success, b/ask: success }
+`,
+    });
+    fs.chmodSync(path.join(dir, 'scripts/tool.sh'), 0o755);
+    fs.chmodSync(path.join(dir, 'tests/stubs/tool.sh'), 0o755);
+    const [result] = runTests([path.join(dir, 'tests')]);
+    expect(result?.failures).toEqual([]);
+  });
+});

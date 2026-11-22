@@ -1,0 +1,12 @@
+name: repo-info
+description: A skill that only wraps one plugin script.
+inputs:
+  base:
+    description: The base branch, when the caller knows it.
+outputs: ${{ steps.info.outputs }}
+steps:
+  - id: info
+    run: repo-info.sh
+    args:
+      - --base: ${{ inputs.base }}
+    stdout: env

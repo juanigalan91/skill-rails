@@ -1,0 +1,26 @@
+name: review-loop
+description: Draft a text, and change it until the user approves it.
+outputs:
+  draft: ${{ steps.loop.outputs.last.draft.outputs.text }}
+steps:
+  - id: loop
+    repeat:
+      until: ${{ steps.decide.outputs.answer == 'approve' || steps.decide.outputs.answer == 'stop' }}
+      max-iterations: 3
+    steps:
+      - id: draft
+        prompt: 'Write the draft (version ${{ loop.number }}). Change: ${{ loop.previous.decide.outputs.answer }}'
+        output: { text: string }
+      - id: decide
+        ask:
+          - id: answer
+            header: Draft
+            question: Approve this draft, or type what to change.
+            other: true
+            options:
+              - { label: Approve, value: approve }
+              - { label: Stop, value: stop }
+  - if: ${{ steps.loop.outputs.exhausted }}
+    fail: The draft was not approved after 3 versions.
+  - if: ${{ steps.loop.outputs.last.decide.outputs.answer == 'stop' }}
+    stop: Stopped with no draft.

@@ -5,6 +5,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod';
 import { check, done, reset, start, status } from './api.js';
 import type { Report } from './types.js';
+import { VERSION } from './version.js';
 
 const reply = (result: Report) => ({
   content: [{ type: 'text' as const, text: JSON.stringify(result) }],
@@ -15,7 +16,7 @@ const LOOP =
   'Act on the status of the result: step → do the step, then call flow_done; invalid → correct the output and call flow_done again; done or failed → tell the user the message.';
 
 export function createServer({ cwd = process.cwd() }: { cwd?: string } = {}): McpServer {
-  const server = new McpServer({ name: 'skill-rails', version: '0.2.3' });
+  const server = new McpServer({ name: 'skill-rails', version: VERSION });
 
   server.registerTool(
     'flow_start',
@@ -23,7 +24,7 @@ export function createServer({ cwd = process.cwd() }: { cwd?: string } = {}): Mc
       description: `Start a skill-rails flow: check the flow file, reset its state, and get the first step to do. ${LOOP}`,
       inputSchema: {
         file: z.string().describe('Path of the flow YAML file.'),
-        inputs: z.record(z.string(), z.union([z.string(), z.boolean(), z.number()])).optional().describe('The flow inputs.'),
+        inputs: z.record(z.string(), z.union([z.string(), z.boolean(), z.number(), z.array(z.string())])).optional().describe('The flow inputs.'),
       },
     },
     async ({ file, inputs }) => reply(start({ file: path.resolve(cwd, file), inputs, cwd })),
@@ -58,7 +59,7 @@ export function createServer({ cwd = process.cwd() }: { cwd?: string } = {}): Mc
   server.registerTool(
     'flow_check',
     { description: 'Check a flow file without running it.', inputSchema: { file: z.string() } },
-    async ({ file }) => reply(check({ file: path.resolve(cwd, file) })),
+    async ({ file }) => reply(check({ file: path.resolve(cwd, file), cwd })),
   );
 
   return server;

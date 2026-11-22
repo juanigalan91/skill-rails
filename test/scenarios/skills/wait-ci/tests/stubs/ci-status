@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Pending on the first call, then the final state of $CI_RESULT.
+n=$(cat .calls 2>/dev/null || echo 0); echo $((n + 1)) > .calls
+if [[ $n -eq 0 ]]; then echo '{"state": "pending"}'
+elif [[ "${CI_RESULT:-passed}" == failed ]]; then echo '{"state": "failed", "failed": ["lint", "test"]}'
+else echo '{"state": "passed"}'; fi

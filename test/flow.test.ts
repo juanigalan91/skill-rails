@@ -28,10 +28,10 @@ describe('validateFlow', () => {
     expect(errorsOf({ name: 'x', steps: [{ id: 'a', run: 'x', stop: 'y' }] })[0]).toContain('must have exactly one of');
   });
 
-  it('refuses an agent step with no id, and an option with no description', () => {
+  it('refuses an agent step with no id, and accepts plain label options', () => {
     expect(errorsOf({ name: 'x', steps: [{ prompt: 'p' }] })[0]).toContain("must have required property 'id'");
-    const ask = { id: 'q', ask: [{ id: 'a', header: 'H', question: 'Q?', options: ['No'] }] };
-    expect(errorsOf({ name: 'x', steps: [ask] }).join()).toContain('options/0');
+    const ask = { id: 'q', ask: [{ id: 'a', header: 'H', question: 'Q?', options: ['Yes', { label: 'No' }] }] };
+    expect(errorsOf({ name: 'x', steps: [ask] })).toEqual([]);
   });
 
   it('refuses a step id that is used twice', () => {
@@ -41,12 +41,18 @@ describe('validateFlow', () => {
 
 describe('loadFlow', () => {
   it('reads a prompt file next to the flow', () => {
-    const dir = tempDir({ 'rails.yaml': 'name: x\nsteps:\n  - id: a\n    prompt-file: prompts/a.md\n', 'prompts/a.md': 'Do ${{ inputs.x }}.\n' });
+    const dir = tempDir({ 'rails.yaml': 'name: x\nsteps:\n  - id: a\n    prompt: prompts/a.md\n', 'prompts/a.md': 'Do ${{ inputs.x }}.\n' });
     expect((loadFlow(path.join(dir, 'rails.yaml')).steps[0] as { prompt?: string }).prompt).toBe('Do ${{ inputs.x }}.\n');
   });
 
+  it('keeps a prompt with spaces or several lines as the instructions', () => {
+    const dir = tempDir({ 'rails.yaml': "name: x\nsteps:\n  - id: a\n    prompt: Read notes.md\n  - id: b\n    prompt: |\n      a.md\n      b.md\n", 'notes.md': 'never read' });
+    const steps = loadFlow(path.join(dir, 'rails.yaml')).steps as Array<{ prompt?: string }>;
+    expect(steps.map((step) => step.prompt)).toEqual(['Read notes.md', 'a.md\nb.md\n']);
+  });
+
   it('reports a missing prompt file and a bad expression', () => {
-    const dir = tempDir({ 'rails.yaml': 'name: x\nsteps:\n  - id: a\n    prompt-file: prompts/none.md\n  - if: nope.x\n    stop: s\n' });
+    const dir = tempDir({ 'rails.yaml': 'name: x\nsteps:\n  - id: a\n    prompt: prompts/none.md\n  - if: nope.x\n    stop: s\n' });
     try {
       loadFlow(path.join(dir, 'rails.yaml'));
       expect.unreachable();

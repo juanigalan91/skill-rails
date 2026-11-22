@@ -1,0 +1,40 @@
+name: fetch-item
+description: Fetch items with a connected tool, or with a script when the tool is not available.
+inputs:
+  ids: { type: list, required: true }
+  files: { type: boolean, default: false }
+  format: { enum: [text, json], default: text }
+outputs:
+  skipped: ${{ steps.ids.outputs.skipped }}
+steps:
+  - id: ids
+    uses: ../parse-ids/rails.yaml
+    with:
+      text: ${{ join(inputs.ids, ' ') }}
+      required: true
+  - id: tool
+    prompt: Fetch ${{ join(steps.ids.outputs.ids, ', ') }} with the connected tool, when it is available.
+    output: { available: boolean }
+  # Exit 3: no token; the next step tries without the files.
+  - id: script
+    if: ${{ !steps.tool.outputs.available }}
+    run: fetch.sh
+    args:
+      - &flags
+        --format: ${{ inputs.format }}
+      - --files: ${{ inputs.files }}
+      - &ids ${{ steps.ids.outputs.ids }}
+    stdout: text
+    continue-on-error: [3]
+  - id: retry
+    if: ${{ steps.script.outcome == 'failure' && inputs.files }}
+    run: fetch.sh
+    args: [*flags, *ids]
+    stdout: text
+  - id: show
+    prompt: 'Show the items: ${{ steps.retry.outputs.value || steps.script.outputs.value }}'
+on-failure:
+  - id: save-error
+    run: printf '%s\n' "$MESSAGE" > error.txt
+    env:
+      MESSAGE: ${{ failure.message }}

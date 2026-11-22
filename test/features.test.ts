@@ -63,13 +63,74 @@ steps:
 
   it('refuses a break outside a foreach', () => {
     dir = tempDir({ 'rails.yaml': 'name: bad\nsteps:\n  - break: true\n' });
-    expect(check({ file: path.join(dir, 'rails.yaml') })).toMatchObject({ status: 'error', errors: ['/steps/0: break is allowed only inside a foreach'] });
+    expect(check({ file: path.join(dir, 'rails.yaml') })).toMatchObject({ status: 'error', errors: ['/steps/0: break is allowed only inside a foreach or a repeat'] });
   });
 
   it('checks the steps inside a foreach', () => {
     const flow = "name: bad\nsteps:\n  - id: each\n    foreach: [1]\n    steps:\n      - id: x\n        run: echo ${{ item }}\n";
     dir = tempDir({ 'rails.yaml': flow });
     expect(check({ file: path.join(dir, 'rails.yaml') })).toMatchObject({ status: 'error', errors: ['/steps/0/steps/0/run must NOT be valid (run step)'] });
+  });
+});
+
+describe('repeat', () => {
+  const FLOW = `
+name: again
+steps:
+  - id: each
+    foreach: [a, b]
+    steps:
+      - id: choose
+        repeat:
+          until: \${{ steps.decide.outputs.answer != 'More' }}
+        steps:
+          - id: more
+            if: \${{ loop.index > 0 }}
+            prompt: 'More about \${{ item }} (\${{ loop.index }})'
+            output: { type: object, required: [draft], properties: { draft: { type: string } } }
+          - id: decide
+            ask:
+              - id: answer
+                header: Draft
+                question: 'Keep \${{ steps.more.outputs.draft || item }}?'
+                options:
+                  - { label: Keep, description: Keep it. }
+                  - { label: More, description: Show more. }
+      - id: keep
+        run: echo "v=$V" >> "$FLOW_OUTPUT"
+        env: { V: '\${{ steps.choose.outputs.last.more.outputs.draft || item }}/\${{ steps.choose.outputs.count }}' }
+  - stop: '\${{ steps.each.outputs.results[0].steps.keep.outputs.v }} \${{ steps.each.outputs.results[1].steps.keep.outputs.v }}'
+`;
+
+  it('runs the steps again until the condition is true, inside a foreach', () => {
+    expect(run({ 'rails.yaml': FLOW })).toMatchObject({ id: 'decide', questions: [{ question: 'Keep a?' }] });
+    expect(answer('again', 'decide', { answer: 'More' })).toMatchObject({ id: 'more', instructions: 'More about a (1)' });
+    expect(answer('again', 'more', { draft: 'a2' })).toMatchObject({ id: 'decide', questions: [{ question: 'Keep a2?' }] });
+    expect(answer('again', 'decide', { answer: 'More' })).toMatchObject({ id: 'more', instructions: 'More about a (2)' });
+    expect(answer('again', 'more', { draft: 'a3' })).toMatchObject({ id: 'decide', questions: [{ question: 'Keep a3?' }] });
+    expect(answer('again', 'decide', { answer: 'Keep' })).toMatchObject({ id: 'decide', questions: [{ question: 'Keep b?' }] });
+    expect(answer('again', 'decide', { answer: 'Keep' })).toMatchObject({ status: 'done', message: 'a3/3 b/1' });
+  });
+
+  it('ends after max-iterations, and marks the loop as exhausted', () => {
+    const flow = "name: max\nsteps:\n  - id: r\n    repeat: { until: false, max-iterations: 3 }\n    steps:\n      - id: n\n        run: echo \"i=$I\" >> \"$FLOW_OUTPUT\"\n        env: { I: '${{ loop.index }}' }\n  - stop: '${{ steps.r.outputs.count }} ${{ steps.r.outputs.exhausted }} ${{ steps.r.outputs.last.n.outputs.i }} ${{ steps.r.outputs.results[0].steps.n.outputs.i }}'\n";
+    expect(run({ 'rails.yaml': flow })).toMatchObject({ status: 'done', message: '3 true 2 0' });
+  });
+
+  it('ends the loop on a break', () => {
+    const flow = "name: brk\nsteps:\n  - id: r\n    repeat: { until: false }\n    steps:\n      - if: '${{ loop.index == 1 }}'\n        break: true\n  - stop: '${{ steps.r.outputs.count }} ${{ steps.r.outputs.broken }} ${{ steps.r.outputs.exhausted }}'\n";
+    expect(run({ 'rails.yaml': flow })).toMatchObject({ status: 'done', message: '2 true false' });
+  });
+
+  it('checks the repeat settings and its steps', () => {
+    const flow = "name: bad\nsteps:\n  - id: r\n    repeat: { max-iterations: 0 }\n    steps:\n      - id: x\n        run: echo ${{ loop.index }}\n";
+    dir = tempDir({ 'rails.yaml': flow });
+    const result = check({ file: path.join(dir, 'rails.yaml') }) as { status: string; errors: string[] };
+    expect(result.status).toBe('error');
+    expect(result.errors).toEqual(expect.arrayContaining([
+      expect.stringContaining('/steps/0/repeat'),
+      '/steps/0/steps/0/run must NOT be valid (run step)',
+    ]));
   });
 });
 

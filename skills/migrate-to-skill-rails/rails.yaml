@@ -5,11 +5,36 @@ inputs:
   auto: { type: boolean, default: false }
 steps:
   - id: context
-    run: node "$FLOW_DIR/scripts/context.mjs"
+    run: context.mjs
     env:
       SOURCE: ${{ inputs.source }}
+  - id: readers
+    run: readers.mjs
+    env:
+      SOURCE: ${{ steps.context.outputs.source }}
+    stdout: json
+  - id: assess
+    prompt: prompts/assess.md
+    output:
+      type: object
+      required: [verdict, reasons]
+      properties:
+        verdict: { enum: [migrate, partial, keep] }
+        reasons: { type: array, minItems: 1, items: { type: string, minLength: 1 } }
+        keep: { type: array, items: { type: string } }
+  - id: confirm
+    if: ${{ steps.assess.outputs.verdict == 'keep' && !inputs.auto }}
+    ask:
+      - id: choice
+        header: Migration
+        question: "This skill is better as Markdown: ${{ join(steps.assess.outputs.reasons, '; ') }}"
+        options:
+          - { label: Keep it as Markdown (Recommended), description: Change nothing., value: keep }
+          - { label: Migrate anyway, description: Write the flow and replace the SKILL.md., value: migrate }
+  - if: ${{ steps.assess.outputs.verdict == 'keep' && steps.confirm.outputs.choice != 'migrate' }}
+    stop: "Kept as Markdown, with no change: ${{ join(steps.assess.outputs.reasons, '; ') }}"
   - id: audit
-    prompt-file: prompts/audit.md
+    prompt: prompts/audit.md
     output:
       type: object
       required: [brief, rules]

@@ -1,0 +1,40 @@
+name: fix-items
+description: Find the issues, then fix and check each one, with a few attempts per issue.
+outputs:
+  fixed: ${{ steps.tally.outputs.fixed }}
+  total: ${{ steps.tally.outputs.total }}
+steps:
+  - id: find
+    prompt: List the issues.
+    output:
+      issues: [{ file: string, summary: string, hint?: string }]
+  - if: ${{ !steps.find.outputs.issues[0] }}
+    stop: No issue.
+  - id: fix
+    foreach: ${{ steps.find.outputs.issues }}
+    steps:
+      - id: attempts
+        repeat:
+          until: ${{ steps.check.outcome == 'success' || steps.decide.outputs.answer == 'skip' }}
+          max-iterations: 2
+        steps:
+          - id: edit
+            prompt: 'Fix issue ${{ loop.parent.number }} of ${{ loop.parent.count }} (attempt ${{ loop.number }}): ${{ item.summary }} in ${{ item.file }}'
+          - id: check
+            run: check.sh
+            args: ['${{ item.file }}']
+            continue-on-error: true
+          - id: decide
+            if: ${{ steps.check.outcome == 'failure' }}
+            ask:
+              - id: answer
+                header: Fix
+                question: 'The check failed: ${{ steps.check.error }}'
+                options:
+                  - { label: Try again, value: again }
+                  - { label: Skip it, value: skip }
+  - id: tally
+    set:
+      fixed: ${{ length(where(steps.fix.outputs.results, 'steps.attempts.outputs.last.check.outcome', 'success')) }}
+      total: ${{ length(steps.find.outputs.issues) }}
+  - note: 'Fixed ${{ steps.tally.outputs.fixed }} of ${{ steps.tally.outputs.total }} issues.'

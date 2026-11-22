@@ -1,0 +1,12 @@
+name: wait-ci
+description: Wait until the checks end, then report them.
+steps:
+  - id: checks
+    run: ci-status
+    stdout: json
+    until: ${{ steps.checks.outputs.state != 'pending' }}
+    interval-seconds: 1
+    timeout-minutes: 1
+  - if: ${{ steps.checks.outputs.state == 'failed' }}
+    fail: "Checks failed: ${{ join(steps.checks.outputs.failed, ', ') }}"
+  - stop: All checks passed.

@@ -37,7 +37,8 @@ it('ships discoverable Codex and portable plugins with their shared resources', 
       'skills/create-skill-rails/prompts/smoke.md', 'skills/create-skill-rails/scripts/scaffold.mjs',
       'skills/create-skill-rails/scripts/validate.mjs', 'skills/create-skill-rails/scripts/output.mjs',
       'skills/migrate-to-skill-rails/rails.yaml', 'skills/migrate-to-skill-rails/prompts/audit.md',
-      'skills/migrate-to-skill-rails/scripts/context.mjs',
+      'skills/migrate-to-skill-rails/scripts/context.mjs', 'skills/migrate-to-skill-rails/prompts/assess.md',
+      'skills/migrate-to-skill-rails/scripts/readers.mjs',
     ]) expect(files.has(file), `npm package must contain ${file}`).toBe(true);
     const legacyServers = read(codex.mcpServers).mcpServers;
     const portableServers = read('mcp.json').mcpServers;

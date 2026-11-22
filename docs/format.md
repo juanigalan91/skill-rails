@@ -9,22 +9,21 @@ name: open-pr                 # kebab-case; the state file and the done command 
 description: Open the PR of the current branch.
 inputs:
   auto:
-    type: boolean             # string (default), boolean or number
+    type: boolean             # string (default), boolean, number or list
     default: false
     description: Run with no questions.
+  mode:
+    enum: [draft, ready]      # the allowed values: the start fails with any other value
+outputs:                      # what the flow gives back at its end (optional)
+  url: ${{ steps.create.outputs.url }}
 steps:
   - id: context
     run: context.sh
   - if: ${{ !steps.context.outputs.commits }}
-    stop: Nothing to merge.
-    outcome: failure
+    fail: Nothing to merge.
   - id: text
-    prompt-file: prompts/text.md
-    output:
-      type: object
-      required: [title]
-      properties:
-        title: { type: string }
+    prompt: prompts/text.md
+    output: { title: string }
   - id: create
     run: create.sh
     env:
@@ -60,16 +59,39 @@ The runner runs the command with `bash -eo pipefail`, in the working directory o
 ```
 
 - `scripts/` next to `rails.yaml` is first in `PATH`, so `run: build.sh` runs `scripts/build.sh`.
-- `$FLOW_DIR` is the folder of `rails.yaml`.
+  Then comes the `scripts/` folder of the plugin that holds the flow: the nearest folder above it with `.claude-plugin/plugin.json` or `.codex-plugin/plugin.json`.
+  The skills of a plugin can so share scripts with no path.
+- A script in `scripts/` needs a shebang (`#!/usr/bin/env bash`, `#!/usr/bin/env node`) and the executable bit (`chmod +x`): then `run: build.mjs` runs it, with no path.
+- `$FLOW_DIR` is the folder of `rails.yaml`, for the other files of the flow.
 - The command writes its outputs to the file `$FLOW_OUTPUT`, as in GitHub Actions: `key=value` lines, or `key<<EOF`, several lines, then `EOF`.
   Later steps read them as `steps.<id>.outputs.<key>`.
-- A `::warning::<text>` line on stdout becomes a note that the agent shows to the user.
+- A `::warning::<text>` line on stdout, or a `WARNING: <text>` line on stderr, becomes a note that the agent shows to the user.
 - A command that fails ends the flow with its last 20 lines of stderr, unless the step has `continue-on-error: true`.
-  `steps.<id>.outcome` is `success` or `failure`.
+  `continue-on-error: [3]` goes on only for these exit codes.
+- `working-directory` runs the command in another folder, relative to the project (or to the `working-directory` of the flow).
+  `steps.<id>.outcome` is `success` or `failure`, `steps.<id>.exitCode` is the exit code, and `steps.<id>.error` holds the last lines of stderr of a failed step.
+- `args` adds arguments to the command, each one quoted for bash.
+  Its values can be `${{ }}` expressions: a list adds each of its items, and `null`, `false` or an empty string adds nothing, so an optional argument needs no shell code.
+  A map adds flags: `--name: true` adds `--name`, a list adds `--name` before each item, another value adds `--name` and the value, and an empty value adds nothing.
 - `env` values can be `${{ }}` expressions.
   A list becomes one line per item, and an object becomes JSON.
 - A `run` command must not hold `${{ }}`: the check refuses it.
-  A value can hold shell code (a commit message, a title), so pass every value with `env`.
+  A value can hold shell code (a commit message, a title), so pass every value with `args` or `env`.
+- `stdout` reads the outputs from what the command prints, so that a script needs no `$FLOW_OUTPUT`:
+  - `text` — `steps.<id>.outputs.value` is the text.
+  - `env` — `KEY=value` lines, as in `$FLOW_OUTPUT`.
+  - `json` — the keys of a JSON object become the outputs; another JSON value is `steps.<id>.outputs.value`.
+  - `jsonl` — `steps.<id>.outputs.value` is the list of the JSON lines, also for one line.
+
+```yaml
+- id: base
+  run: git-base-branch.sh
+  args:
+    - ${{ inputs.base }}
+    - --refresh: ${{ inputs.refresh }}    # --refresh when true
+      --worktree: ${{ inputs.worktree }}  # --worktree <path> when set
+  stdout: env                     # BASE=main → steps.base.outputs.BASE
+```
 
 #### Polling
 
@@ -94,7 +116,7 @@ The agent follows the instructions, then reports an output.
 
 ```yaml
 - id: summary
-  prompt-file: prompts/summary.md
+  prompt: prompts/summary.md
   output:
     type: object
     required: [summary]
@@ -102,15 +124,39 @@ The agent follows the instructions, then reports an output.
       summary: { type: string, maxLength: 300 }
 ```
 
-- `prompt` holds the instructions inline, and `prompt-file` names a Markdown file relative to `rails.yaml`.
+- `prompt` holds the instructions, or the path of a Markdown file with them, relative to `rails.yaml`.
+  A prompt is a file path when it is one word that ends with `.md`, for example `prompts/summary.md`; the check fails when the file is missing.
+  Any other text, with spaces or several lines, is the instructions.
   Both can hold `${{ }}` expressions.
-- `output` is a JSON Schema.
+- `output` is a JSON Schema, or its short form.
   The runner validates the reported output and refuses it with the errors when it does not match.
   With no `output`, the agent reports nothing, or any JSON object.
+- The short form maps each property to its type:
+
+  ```yaml
+  output:
+    title: string                 # required, not empty
+    draft: boolean
+    kind: fix | skip | ask        # one of these texts
+    files: [string]               # a list
+    issues: [{ file: string, line?: integer }]
+    note?: string                 # optional (the ? can also go after the type)
+    details: { type: string, maxLength: 300 }   # a full schema for one property
+  ```
+
+  The types are `string`, `boolean`, `number`, `integer`, `object`, `array` and `any`.
+  An output with only JSON Schema keywords (for example `type` and `properties`) is a full schema; a property named `type` alone needs the full form.
+- The check refuses an output schema with an unknown keyword.
+  The usual cause is a YAML flow map with a comma in a text: `{ type: string, description: The title, in a few words }` splits the description into a stray key.
+  Quote such a text.
+
+A `prompt` or `skill` step with `working-directory` has `directory` in its report: the agent does the step in that folder.
+
+A `prompt` or `skill` step with `continue-on-error: true` goes on when the agent reports with `--fail` that it cannot do the step: `steps.<id>.outcome` is then `failure`, and `steps.<id>.error` holds the reason.
 
 ### `skill`
 
-The agent loads and follows another installed skill through its host’s supported mechanism, with `with` as its arguments, then follows the optional `prompt` or `prompt-file`. If the skill is unavailable, the agent reports failure.
+The agent loads and follows another installed skill through its host’s supported mechanism, with `with` as its arguments, then follows the optional `prompt`. If the skill is unavailable, the agent reports failure.
 
 ```yaml
 - id: review
@@ -147,10 +193,24 @@ The agent asks the user one or more questions using a native question tool or ch
 
 - Every option needs a `label` and a `description`.
   An option can also have a `preview`: text that the question tool shows next to it, for example a draft to approve.
+- An option with a `value` puts that value in the step output in place of its label, so that later steps do not repeat the label: `{ label: Yes — fetch it, description: …, value: true }`.
+- An option can be a plain label (`options: [Push, Stop]`), and its `description` is optional.
 - An option can be an expression that gives a list of options.
 - A question with a false `if` is left out.
   When all the questions are left out, the step is skipped.
 - The output has one property per question `id`: the label, or a list of labels for `multiSelect`.
+- `other: true` keeps the options, and the user can also type another answer: the output is the label or the text.
+- `ask` can also be an expression that gives the questions, for example the questions that an agent step wrote:
+
+  ```yaml
+  - id: answers
+    ask: ${{ steps.investigate.outputs.questions }}   # a list of { id?, header?, question, options?, multiSelect?, other? }
+    max: 4                                            # default 4: the extra questions are left out
+    extra-options:                                    # added to each question that has options
+      - { label: I don't know, description: Leave it out. }
+  ```
+
+  A question with no `id` gets `q1`, `q2` and so on, a long `header` is cut to 12 characters, an option can be a plain label, and a question with no options takes free text.
   The runner validates the labels.
 
 - A question with `free: true` takes free text: the agent asks it in a normal message and reports the reply.
@@ -186,6 +246,42 @@ The runner runs the steps once for each item of a list.
 - A `break` step (`break: true`, often with an `if`) ends the loop, and the flow goes on after it.
   `steps.<id>.outputs.done` is then the number of iterations that ran, and `broken` is true.
 
+### `repeat`
+
+The runner runs the steps again and again, until a condition is true: for example, until the user stops asking for more context.
+
+```yaml
+- id: choose
+  repeat:
+    until: ${{ steps.decide.outputs.answer != 'Show more context' }}
+    max-iterations: 10            # default 10
+  steps:
+    - id: more
+      if: ${{ loop.index > 0 }}   # not in the first iteration
+      prompt: prompts/more.md
+      output: { type: object, required: [draft], properties: { draft: { type: string } } }
+    - id: decide
+      ask:
+        - id: answer
+          header: Draft
+          question: Keep this draft?
+          options:
+            - { label: Keep, description: Keep it., preview: '${{ steps.more.outputs.draft || steps.draft.outputs.draft }}' }
+            - { label: Show more context, description: Read more before you decide. }
+- stop: 'Kept: ${{ steps.choose.outputs.last.more.outputs.draft || steps.draft.outputs.draft }}'
+```
+
+- The runner checks `until` after each iteration, with the results of that iteration.
+  The loop ends when `until` is true, or after `max-iterations` iterations.
+- Inside, `loop.index` is the number of the iteration (from 0), and `loop.count` is `max-iterations`.
+- `loop.number` is `loop.index + 1`, and `loop.parent` is the loop around this one, for example the `foreach` around a `repeat`: `${{ loop.parent.number }}`.
+- `loop.previous` holds the step results of the last iteration (null in the first one), for example the change that the user asked for: `${{ loop.previous.approve.outputs.answer }}`.
+  In a `repeat` inside a `foreach`, `item` stays the item of the `foreach`.
+- Each iteration starts with no results, as in a `foreach`.
+- After the loop, `steps.<id>.outputs.last` holds the step results of the last iteration, `count` is the number of iterations, and `results` is the list of the iterations: `{ steps }`.
+  `exhausted` is true when the loop ended at `max-iterations` with `until` still false.
+- A `stop` inside the loop ends the flow, and a `break` ends the loop: `broken` is then true.
+
 ### `uses`
 
 The runner runs another flow as one step.
@@ -201,7 +297,56 @@ The runner runs another flow as one step.
 - The other flow has its own inputs (from `with`), its own steps and its own folder (`flow.dir`, `scripts/`).
 - Its end becomes the outputs of the step: `status` (`done` or `failed`), `message` (its stop message), and `steps` (its step results).
 - When it fails, the flow fails, unless the step has `continue-on-error: true`.
+  The failure can be a `run` step, a `stop` with `outcome: failure`, or an agent step that the agent reports with `--fail`.
+- `working-directory`: the folder where the other flow runs its commands and its agent steps, relative to the project, for example a PR worktree.
+  An agent step there has `directory` in its report.
+- `forward-stop: true`: a `stop` step of the other flow also ends this flow, with the same message and outcome.
 - `check` loads the other flows too, and refuses flows that use each other.
+
+#### The flow of another skill
+
+`uses: skill:<plugin>:<skill>` runs the `rails.yaml` of a skill in another plugin, and `uses: skill:<skill>` the one of a standalone skill.
+Use it when the other skill is installed separately, so that no relative path can reach it.
+
+```yaml
+- id: pr
+  uses: skill:acme-core:pr-context
+- if: ${{ !steps.pr.outputs.steps.context.outputs.PR_NUMBER }}
+  stop: No open pull request.
+```
+
+The runner looks for the skill folder in this order, and uses the first one with a `rails.yaml`:
+
+1. The folders of `SKILL_RAILS_SKILLS_PATH` (separated by `:`): `<dir>/<plugin>/skills/<skill>`, then `<dir>/<skill>`.
+2. A checkout above the flow file: a folder with `.claude-plugin/plugin.json` for this plugin (`skills/<skill>`), or with `.claude-plugin/marketplace.json` that lists the plugin with a relative `source`.
+   In a repository of plugins, the flows and their tests then use the versions of the same commit.
+3. The plugins that Claude Code installed (`installed_plugins.json` in `CLAUDE_CONFIG_DIR` or `~/.claude`), the ones of the marketplace of the flow first.
+4. For `skill:<skill>`: `.claude/skills`, `.agents/skills` in the working directory, and `~/.claude/skills`.
+
+### `note`
+
+The runner shows a message to the user (a note in the next report), and the flow goes on.
+An empty message shows nothing.
+
+```yaml
+- if: ${{ steps.after.outputs.value }}
+  note: 'The checks changed these files: ${{ steps.after.outputs.value }}'
+```
+
+### `set`
+
+Computes values with expressions, with no command and no agent turn.
+The values keep their types: a boolean stays a boolean, and a list stays a list.
+
+```yaml
+- id: target
+  set:
+    site: ${{ inputs.site || steps.search.outputs.site }}
+    rest: ${{ !steps.mcp.outputs.available }}
+    metadata: ${{ inputs.metadata || fromJSON('[]') }}
+```
+
+Later steps read `steps.target.outputs.site`.
 
 ### `stop`
 
@@ -213,6 +358,8 @@ The runner ends the flow with a message.
   outcome: failure     # success (default) or failure
 ```
 
+`fail: <message>` is the short form of a `stop` with `outcome: failure`.
+
 The last step of a flow is usually a `stop` with the result.
 A flow with no more steps ends with `done` and no message.
 
@@ -222,14 +369,20 @@ A flow with no more steps ends with `done` and no message.
 
 | Context | Value |
 |---------|-------|
-| `inputs.<name>` | A flow input. |
+| `inputs.<name>` | A flow input. A `list` input is a list: from the CLI, give a JSON list, or one item per line or per comma. |
 | `steps.<id>.outcome` | `success`, `failure` or `skipped`. |
+| `steps.<id>.exitCode`, `steps.<id>.error` | A run step: its exit code, and the last lines of stderr when it failed. |
 | `steps.<id>.outputs.<key>` | An output of a `run` step, or a property of the output of an agent step. |
-| `item`, `loop.index`, `loop.count` | Inside a `foreach`: the current item and its place. |
+| `item`, `loop.index`, `loop.count`, `loop.previous` | Inside a `foreach`: the current item and its place. Inside a `repeat`: the number of the iteration and `max-iterations`. `loop.previous`: the step results of the last iteration. |
 | `env.<NAME>` | An environment variable of the runner. |
 | `flow.dir`, `flow.name` | The folder and the name of the flow. |
 
-- The functions are the GitHub ones: `contains`, `startsWith`, `endsWith`, `format`, `join`, `toJSON`, `fromJSON`.
+- The functions are the GitHub ones: `contains`, `startsWith`, `endsWith`, `format`, `join`, `toJSON`, `fromJSON`, and these:
+  - `length(value)`: the number of items of a list, of keys of an object, or of characters of a text.
+  - `split(text, separator)`: the parts of a text, trimmed, with no empty part; the default separator is a new line.
+  - `list(a, b, ...)`: a list of the values, for example `contains(list('fetch', 'reply'), inputs.command)`.
+  - `where(list, path, value)`: the items whose value at the path is the value, or is true with no value: `length(where(steps.fix.outputs.results, 'steps.check.outcome', 'success'))`.
+- `.*` takes a property of each item of a list: `join(steps.check.outputs.unread.*.reason, ', ')`.
 - `==` compares strings with no case.
 - A value that is one expression keeps the type of its result (a list, a boolean).
   Text with expressions becomes a string.
@@ -237,20 +390,49 @@ A flow with no more steps ends with `done` and no message.
 - A step that did not run has no outputs, so `steps.<id>.outputs.<key>` is `null`.
   A step that depends on a skipped step is often skipped too.
 
+## Failure steps
+
+`on-failure` lists steps that run when the flow fails, before the `failed` report, for example to write the reason to a file that a caller reads or to restore a file.
+`failure.message` holds the reason.
+The flow still fails with that reason, also when a failure step fails.
+
+```yaml
+on-failure:
+  - id: save-error
+    run: mkdir -p out && printf '%s\n' "$MESSAGE" > out/error.txt
+    env:
+      MESSAGE: ${{ failure.message }}
+```
+
+## Flow outputs
+
+`outputs` gives values back at the end of the flow: an object of expressions, or one expression that gives an object.
+
+```yaml
+outputs: ${{ steps.context.outputs }}   # every output of the step
+```
+
+- The `done` and `failed` reports hold them in `outputs`: a skill that other skills call gives them to its caller.
+- A `uses` step gets them directly in `steps.<id>.outputs.<name>`, next to `status`, `message` and `steps`.
+
 ## The protocol
 
 Each command prints one JSON object.
+The CLI adds `next` to a `step` report, the command that reports it, and `protocol` to the `start` report, the text below for the agent: a `SKILL.md` needs only the `start` command and "Follow the `protocol` of the first result".
 
 | `status` | Meaning | The agent |
 |----------|---------|-----------|
 | `step` | A step waits for the agent: `id`, `type`, and `instructions`, `skill` and `args`, or `questions`, with `output`. | Does the step, then reports it with `done`. |
 | `step` with `type: wait` | A polling step needs more time. | Reports it with `done` and no output, to keep waiting. |
 | `invalid` | The output does not match: `errors`. | Corrects the output and reports it again. |
-| `done` | The flow ended: `message`. | Tells the user the message. |
+| `done` | The flow ended: `message`, and `outputs` when the flow declares them. | Tells the user the message, and gives the caller the outputs. |
 | `failed` | A step failed, a `stop` with `outcome: failure`, or a `--fail`: `message`. | Tells the user the message. |
 | `error` | The flow file or a command is not valid: `errors`. | Tells the user the errors. |
 
-A result can also have `notes`: the warnings of the run steps, which the agent shows to the user.
+A result can also have `notes`: the warnings of the run steps and the `note` steps, which the agent shows to the user.
+
+The CLI adds `next` to a `step` result: the exact command that reports the step, with `--cwd`.
+A skill that runs a flow then needs no copy of the commands: the agent runs `next` with its output.
 
 CLI commands accept `--cwd <project-directory>`, including `mcp` to bind the server to a project. Paths are relative to this directory. Reports from `start`, `done`, and `status` include `cwd`.
 
