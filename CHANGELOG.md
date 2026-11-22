@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Add schema-aware YAML linting through ESLint, using the existing workflow schema to reject unknown keys and invalid types.
+- Run linting in CI and before npm publication; recommend YAML/ESLint editor extensions and configure local schema completion.
+
 ## 0.3.0
 
 - Add the `repeat` step: it runs its steps again until a condition is true, for example to show more context and ask again until the user decides.
