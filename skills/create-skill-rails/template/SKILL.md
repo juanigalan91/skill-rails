@@ -13,7 +13,7 @@ Resolve [rails.yaml](rails.yaml) relative to this SKILL.md and substitute its ab
 1. Start the run:
 
    ```bash
-   npx -y skill-rails@0.4 start "<absolute-path-to-this-skill>/rails.yaml" [--input <key>=<value> ...]
+   npx -y skill-rails@0.5 start "<absolute-path-to-this-skill>/rails.yaml" [--input <key>=<value> ...]
    ```
 
 2. Follow the `protocol` of the first result until the run ends.

@@ -6,7 +6,7 @@
       "command": "npx",
       "args": [
         "-y",
-        "skill-rails@0.4",
+        "skill-rails@0.5",
         "mcp"
       ]
     }

@@ -159,6 +159,8 @@ export interface Rails {
   'on-failure'?: Step[];
   /** The folder of the rails file. */
   dir: string;
+  /** A TypeScript rails file: the path of its file, whose run function the runner replays. */
+  code?: string;
 }
 
 export type InputValue = string | number | boolean | string[] | null;
@@ -249,6 +251,8 @@ export interface State {
   message: string | null;
   /** The outputs of the run, at its end. */
   outputs?: Record<string, unknown>;
+  /** A TypeScript rails file: its steps in call order, with their results and nested runs, and the count of notes already given. */
+  replay?: { calls: Array<{ id: string; result?: StepResult; child?: State }>; notes: number };
 }
 
 export interface LoopContext {
@@ -297,6 +301,6 @@ export type Report = (
   | { status: 'done' | 'failed' | 'running'; rails: string; message: string | null; outputs?: Record<string, unknown>; notes?: string[] }
   | { status: 'invalid'; id: string; errors: string[]; output?: JsonObject }
   | { status: 'error'; errors: string[] }
-  | { status: 'ok'; rails: string; steps: number }
+  | { status: 'ok'; rails: string; steps?: number }
   | { status: 'reset'; rails: string }
 ) & { cwd?: string; next?: string; /** start: how the agent acts on each result. */ protocol?: string };

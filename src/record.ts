@@ -55,11 +55,18 @@ function walk(steps: Step[] | undefined, results: Results | undefined, scope: st
   }
 }
 
-function occurrences(state: State): Occurrence[] {
+function occurrences(state: State, scope: string[] = []): Occurrence[] {
   const results = foldedResults(state);
+  // A TypeScript rails file: its agent steps in call order, and the steps of its nested runs.
+  if (state.rails.code) {
+    return (state.replay?.calls ?? []).flatMap(({ id, result, child }) => {
+      if (child) return occurrences(child, [...scope, id]);
+      return result?.request ? [{ key: [...scope, id].join('/'), id, result }] : [];
+    });
+  }
   const out: Occurrence[] = [];
-  walk(state.rails.steps, results, [], out);
-  walk(state.rails['on-failure'], results, [], out);
+  walk(state.rails.steps, results, scope, out);
+  walk(state.rails['on-failure'], results, scope, out);
   return out;
 }
 
@@ -73,7 +80,9 @@ export function record({ rails, cwd = process.cwd(), out }: { rails: string; cwd
   const answers = Object.fromEntries([...grouped].map(([key, list]) => [key, list.length === 1 && !Array.isArray(list[0]) ? list[0] : list]));
   const inputs = Object.fromEntries(Object.entries((state.frames[0] as Frame).inputs).filter(([, value]) => value !== null));
   const results = (state.frames[0] as Frame).results;
-  const ids = [...state.rails.steps, ...(state.rails['on-failure'] ?? [])].map((step) => step.id).filter((id): id is string => Boolean(id && results[id]));
+  const ids = state.rails.code
+    ? [...new Set((state.replay?.calls ?? []).map((call) => call.id))].filter((id) => results[id])
+    : [...state.rails.steps, ...(state.rails['on-failure'] ?? [])].map((step) => step.id).filter((id): id is string => Boolean(id && results[id]));
   const ended = state.status !== 'running';
   return {
     rails: out ? path.relative(path.dirname(path.resolve(out)), state.file) : state.file,

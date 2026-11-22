@@ -2,7 +2,7 @@
 
 `skill-rails test` runs a rails file for real, with fixed answers in place of the agent.
 It finds the `*.test.yaml` files in all folders below its targets (not in `node_modules`, `.git`, `dist`, `coverage` or `.nx`), so a repository with many skills needs no script: put `skill-rails test . --quiet` in its test command.
-It needs no model, no network and no API key, so a test takes milliseconds and gives the same result every time.
+Fixed-answer tests need no model or API key. Commands still run for real: use fixtures and stubs to keep tests repeatable and avoid network calls.
 
 ```bash
 skill-rails test                      # every *.test.yaml under the current folder
@@ -12,6 +12,36 @@ skill-rails test . --quiet            # a whole repository: only the failures an
 skill-rails test --live               # also the tests that need a real agent: live steps, judge and agent mode
 skill-rails test --live --agent "codex exec"   # the same tests with another agent command
 ```
+
+## Tests and evals
+
+A skill-rails test replaces the model with fixed answers, and runs the real rails file.
+It checks step order, gates, failure paths, scripts, files, and contracts for the scenarios covered by its fixtures and answers.
+With controlled command results and fixtures, it costs no model tokens, is repeatable, and can block a merge.
+It does not prove the quality of the model's judgment, that an agent follows the protocol, or that the host picks the skill.
+
+An eval runs a real model and grades its output.
+It tests judgment, costs tokens, and can give a different result on each run.
+
+A rails file makes evals smaller:
+
+- Use deterministic tests for scripts and gates; keep fixtures and stubs representative.
+- Each prompt step is a small eval unit, with fixed instructions, a rendered context and an output schema.
+- The schema makes the structure checks free.
+- The runner enforces submitted step order; evaluate judgment and protocol compliance separately.
+
+The tools:
+
+| Tool | Use |
+|------|-----|
+| Fixed answers | Every commit: the paths of the rails file, with no model. |
+| Live steps and `judge` | Evaluate one step in its real context, with a rubric. |
+| `mode: agent` | A protocol smoke run on each host, and trigger checks. |
+| `skill-rails record` | A real run becomes a regression test. |
+| `skill-rails trace` | Real runs become an eval dataset, one line per step. |
+
+Host-level skill-selection evals are complementary: they check whether the agent picks the skill for the right requests.
+The sections below describe each mode and its configuration.
 
 ## A test file
 
@@ -217,3 +247,33 @@ Add stubs for the network commands, and `$files` for the files that the agent wr
 
 Each line is an eval case: the exact input and output of one step of a real run.
 `request` is what the agent was asked, and `answer` is what it reported.
+
+## Bench
+
+`skill-rails bench <bench.yaml>` runs the same tests several times for each variant of a skill, and prints the medians.
+Use it to compare a YAML rails file, a `rails.ts` and a plain Markdown skill.
+
+```yaml
+# bench.yaml
+tests: tests            # test files or folders, relative to this file
+runs: 10
+variants:
+  yaml: {}                          # the rails file of each test
+  ts: { rails: rails.ts }           # a file name: the file next to the rails file of each test
+  markdown:                         # a skill with no rails file
+    markdown: true
+    agent: claude -p --output-format json --plugin-dir bench/markdown
+```
+
+- Without `--live`, it runs the fixed-answer tests: it measures the runner, with no model and no cost. A Markdown variant has no such run.
+- With `--live`, it runs the `mode: agent` tests with a real agent. Give each variant the agent command that loads that version of the skill, for example a `--plugin-dir` with only that version.
+  With a JSON agent output (`claude -p --output-format json`), it also reads the turns, the input and output tokens, and the cost.
+- A Markdown variant keeps only the `files`, `transcript` and `judge` expectations: it has no run state to check.
+- The runs go in a shuffled order, so that the effects of time and cache spread over the variants.
+- `--runs <n>` sets the count of runs, `--out <file.csv>` writes one line per run, and `--transcripts <dir>` saves the output of the agent of each live run.
+
+For a fair comparison, use the same model, request and fixture for all the variants, and at least 10 runs.
+Isolate the agent: `claude -p --output-format json --strict-mcp-config --setting-sources project --plugin-dir <variant>` loads only the plugins of the variant, with no user MCP server and no user settings.
+A user MCP server can also keep `claude -p` open after its answer.
+To run a local build of skill-rails, set `SKILL_RAILS_COMMAND` (for example `node <checkout>/bin/skill-rails.js`): the `next` command of each report then uses it.
+A YAML and a TS variant give the agent the same reports: the difference between them shows the noise of the measure.

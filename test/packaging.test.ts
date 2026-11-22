@@ -29,6 +29,9 @@ it('ships discoverable Codex and portable plugins with their shared resources', 
     expect(files.has('hooks/hooks.json')).toBe(true);
     expect(files.has('schema/rails.schema.json')).toBe(true);
     expect(files.has('dist/rails.js')).toBe(true);
+    for (const file of ['dist/code.js', 'dist/define.js', 'dist/bench.js', 'dist/define.d.ts', 'docs/walkthrough.md', 'docs/architecture.md', 'docs/cli.md', 'docs/design.md', 'docs/benchmarks.md']) {
+      expect(files.has(file), `npm package must contain ${file}`).toBe(true);
+    }
     expect(files.has('dist/flow.js')).toBe(false);
     expect(files.has('schema/flow.schema.json')).toBe(false);
     const marketplace = read('.agents/plugins/marketplace.json');

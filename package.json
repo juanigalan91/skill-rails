@@ -1,7 +1,7 @@
 {
   "name": "skill-rails",
-  "version": "0.4.0",
-  "description": "Deterministic, testable YAML rails for AI agent skills, in GitHub Actions syntax.",
+  "version": "0.5.0",
+  "description": "Deterministic, testable YAML and TypeScript rails for AI agent skills.",
   "type": "module",
   "license": "MIT",
   "bin": "bin/skill-rails.js",
@@ -51,6 +51,7 @@
     "@actions/expressions": "^0.3.61",
     "@modelcontextprotocol/sdk": "^1.32.2",
     "ajv": "^8.17.1",
+    "jiti": "^2.4.2",
     "js-yaml": "^4.1.0",
     "zod": "^3.25.0"
   },

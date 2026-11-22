@@ -47,7 +47,7 @@ codex plugin add skill-rails@skill-rails
 
 Use a Codex version whose `codex plugin --help` exposes these commands. Restart the client or start a new session after installation. The plugin bundles `run-skill-rails`, `create-skill-rails`, and `migrate-to-skill-rails`, plus the stdio MCP server; no manual skill wrappers or separate MCP registration are needed. In desktop clients, the marketplace can also be browsed through the Plugins UI.
 
-Launch Codex in the intended project and check `cwd` in the first report. The bundled MCP server uses `npx -y skill-rails@0.4 mcp`, so Node, npm, Bash, and access to the npm registry (or a cached package) are required. The plugin installs instructions and configuration; it does not vendor npm dependencies or install Node.
+Launch Codex in the intended project and check `cwd` in the first report. The bundled MCP server uses `npx -y skill-rails@0.5 mcp`, so Node, npm, Bash, and access to the npm registry (or a cached package) are required. The plugin installs instructions and configuration; it does not vendor npm dependencies or install Node.
 
 The package has portable `plugin.json` and `mcp.json` files, a `.codex-plugin/plugin.json` compatibility manifest, and a `.agents/plugins/marketplace.json` catalog pointing to the package root. Both formats share the same skills and npm runner as the Claude plugin. This adds local/Git marketplace support, not public-directory publication.
 
@@ -144,7 +144,7 @@ description: Run a skill-rails file, one validated step at a time.
 
 Read and follow [the runner instructions](/absolute/path/to/skill-rails/skills/run-skill-rails/SKILL.md).
 Use the configured skill-rails MCP tools. For CLI fallback in this checkout, replace
-`npx -y skill-rails@0.4` with `node /absolute/path/to/skill-rails/bin/skill-rails.js`.
+`npx -y skill-rails@0.5` with `node /absolute/path/to/skill-rails/bin/skill-rails.js`.
 ```
 
 Repeat for `create-skill-rails` and `migrate-to-skill-rails`, linking to their corresponding files and describing their purpose. This keeps templates and documentation beside their original skills; copying only a skill directory would break its links to `../../docs/`. After publication, wrappers can point to a stable installed package instead. Restart or reload skills in the client and verify discovery.

@@ -130,7 +130,7 @@ function loopContext(loops: Frame[]): Context['loop'] {
   };
 }
 
-function contextOf(state: State): Context {
+export function contextOf(state: State): Context {
   const frames = currentRailsFrames(state);
   const railsFrame = frames[0] as Frame;
   const inner = [...frames].reverse();
@@ -271,7 +271,7 @@ function dynamicQuestions(step: AskStep, context: Context): Question[] {
   });
 }
 
-function askStep(step: AskStep, context: Context): PendingStep | null {
+export function askStep(step: AskStep, context: Context): PendingStep | null {
   const source = typeof step.ask === 'string' ? dynamicQuestions(step, context) : step.ask;
   const questions = source
     .filter((question) => condition(question.if, context))
@@ -309,7 +309,7 @@ function askStep(step: AskStep, context: Context): PendingStep | null {
 /** The values of a with map, as a YAML block. */
 const valuesBlock = (values: unknown): string => yaml.dump(values, { lineWidth: -1, noRefs: true, skipInvalid: true }).trimEnd();
 
-function agentStep(step: SkillStep | PromptStep, kind: 'skill' | 'prompt', context: Context): PendingStep {
+export function agentStep(step: SkillStep | PromptStep, kind: 'skill' | 'prompt', context: Context): PendingStep {
   const skillStep = kind === 'skill' ? (step as SkillStep) : undefined;
   const values = step.with === undefined ? undefined : render(step.with, context);
   const map = values !== undefined && typeof step.with === 'object' ? valuesBlock(values) : undefined;
@@ -326,9 +326,9 @@ function agentStep(step: SkillStep | PromptStep, kind: 'skill' | 'prompt', conte
   };
 }
 
-const tail = (stderr: string): string => stderr.trim().split('\n').slice(-TAIL_LINES).join('\n');
+export const tail = (stderr: string): string => stderr.trim().split('\n').slice(-TAIL_LINES).join('\n');
 
-function failureMessage(id: string, exitCode: number, stderr: string): string {
+export function failureMessage(id: string, exitCode: number, stderr: string): string {
   const last = tail(stderr);
   return `Step "${id}" failed with exit code ${exitCode}.${last ? `\n${last}` : ''}`;
 }

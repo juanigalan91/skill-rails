@@ -85,6 +85,8 @@ export interface TestResult {
   ms: number;
   /** The test needs a real agent, and the run has no --live. */
   skipped?: boolean;
+  /** Agent mode: the stdout of the agent command. */
+  transcript?: string;
 }
 
 const isRegex = (value: unknown): value is string => typeof value === 'string' && value.length > 1 && value.startsWith('/') && value.endsWith('/');
@@ -188,6 +190,12 @@ function answerKey(answers: Record<string, unknown>, id: string, rails: string, 
   }
   for (let i = 0; i < scope.length; i++) {
     const key = [...scope.slice(i), id].join('/');
+    if (key in answers) return key;
+  }
+  // A TypeScript rails file gives the pending step of a nested run as <uses id>/<step id>.
+  const parts = id.split('/');
+  for (let i = 0; i < parts.length; i++) {
+    const key = parts.slice(i).join('/');
     if (key in answers) return key;
   }
   return id;
@@ -438,7 +446,9 @@ function checkExpectations(run: Run, report: Report | null): void {
   const steps = state ? rootResults(state) : {};
   for (const [id, outcome] of Object.entries(expect.steps ?? {})) {
     const actual = stepAt(steps, id)?.outcome ?? 'not reached';
-    if (actual !== outcome) failures.push(`step "${id}": expected ${outcome}, got ${actual}`);
+    // A TypeScript rails file does not call the steps that it does not need: skipped and not reached are the same.
+    const same = actual === outcome || (state?.rails.code && actual === 'not reached' && outcome === 'skipped');
+    if (!same) failures.push(`step "${id}": expected ${outcome}, got ${actual}`);
   }
   for (const [key, expected] of Object.entries(expect.outputs ?? {})) {
     const [id, ...rest] = key.split('.');
@@ -478,7 +488,10 @@ function runOnce(test: TestCase, agent: Agent): TestResult {
   const began = Date.now();
   const dir = path.dirname(path.resolve(test.file));
   const run: Run = { test, dir, cwd: '', agent, railsName: '', failures: [], trace: [], notes: [] };
-  const result = (): TestResult => ({ name: test.name, file: test.file, passed: run.failures.length === 0, failures: run.failures, trace: run.trace, ms: Date.now() - began });
+  const result = (): TestResult => ({
+    name: test.name, file: test.file, passed: run.failures.length === 0, failures: run.failures, trace: run.trace, ms: Date.now() - began,
+    ...(run.transcript === undefined ? {} : { transcript: run.transcript }),
+  });
 
   const stateDir = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-rails-state-'));
   const cwd = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'skill-rails-run-')));

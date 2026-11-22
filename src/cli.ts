@@ -23,23 +23,26 @@ export const PROTOCOL = [
 /** The command that reports the step of a result, so that a skill needs no copy of the protocol. */
 export function withNext(result: Report): Report {
   if (result.status !== 'step') return result;
-  const base = `npx -y skill-rails@${RANGE} done ${result.rails} ${result.id}${result.cwd ? ` --cwd ${quote(result.cwd)}` : ''}`;
+  // SKILL_RAILS_COMMAND runs another build, for example a local checkout: node <checkout>/bin/skill-rails.js.
+  const base = `${process.env.SKILL_RAILS_COMMAND || `npx -y skill-rails@${RANGE}`} done ${result.rails} ${result.id}${result.cwd ? ` --cwd ${quote(result.cwd)}` : ''}`;
   const next = result.type !== 'wait' && result.output ? `${base} --output - <<'JSON'\n<the output, as JSON>\nJSON` : base;
   return { ...result, next };
 }
 
 const USAGE = `Usage:
-  skill-rails start <rails.yaml> [--input <key>=<value> ...]   check the rails file, reset the state of the run, print the first agent step
+  skill-rails start <rails file> [--input <key>=<value> ...]   check the rails file, reset the state of the run, print the first agent step
   skill-rails done <rails> <step-id> [--output <json> | -]     record the output of a step, print the next step
   skill-rails done <rails> <step-id> --fail <reason>           end the run with an error
   skill-rails status <rails>                                   print the current step and the step results
   skill-rails reset <rails>                                    delete the state of a run
-  skill-rails check <rails.yaml>                               check a rails file without running it
+  skill-rails check <rails file>                               check a rails file without running it
   skill-rails test [<file or folder> ...] [--json]             run the *.test.yaml tests in these files and folders, and all folders below (default: the current folder); --quiet shows only the failures
       [--live] [--agent <command>]                             --live also runs the tests with live steps, judge or mode: agent, with the agent command (default: SKILL_RAILS_AGENT, else claude -p)
   skill-rails record <rails> [--out <file>]                    write a test file from the state of a run (default: stdout)
   skill-rails trace <rails>                                    print one JSON line per agent step of the run: its request, answer and outcome
   skill-rails mcp                                              run the MCP server on stdio
+  skill-rails bench <bench.yaml> [--runs <n>] [--out <csv>]   run the tests of each variant of a skill several times, and print the medians
+      [--live] [--agent <command>] [--transcripts <dir>]       --live runs the mode: agent tests with a real agent, reads its turns, tokens and cost, and can save each agent output
   skill-rails hook                                             the host hook: reads the hook JSON on stdin (Claude Code and Codex)
   skill-rails hooks                                            print the hooks configuration that runs the hook
   All commands accept --cwd <project-directory>.`;
@@ -160,6 +163,19 @@ export async function main(argv: string[], print = (value: Report) => process.st
         const { trace } = await import('./record.js');
         for (const line of trace({ rails: first, cwd })) process.stdout.write(`${JSON.stringify(line)}\n`);
         return 0;
+      }
+      case 'bench': {
+        if (!first || first.startsWith('--')) throw new Error(USAGE);
+        const { bench, summary, toCsv } = await import('./bench.js');
+        const runs = option(args, 'runs');
+        const transcripts = option(args, 'transcripts');
+        const rows = bench(file(first), { live: args.includes('--live'), runs: runs ? Number(runs) : undefined, agent: option(args, 'agent'), transcripts: transcripts && file(transcripts) });
+        const out = option(args, 'out');
+        if (out) fs.writeFileSync(file(out), toCsv(rows));
+        const lines = summary(rows);
+        const keys = [...new Set(lines.flatMap((line) => Object.keys(line)))];
+        process.stdout.write(`${keys.join(' | ')}\n${keys.map(() => '---').join(' | ')}\n${lines.map((line) => keys.map((key) => line[key] ?? '').join(' | ')).join('\n')}\n`);
+        return rows.every((row) => row.passed) ? 0 : 1;
       }
       case 'hook': {
         const { hook } = await import('./hook.js');
