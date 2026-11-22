@@ -12,7 +12,7 @@ function cli(args: string[], { cwd, input }: { cwd: string; input?: string }) {
     cwd,
     input,
     encoding: 'utf8',
-    env: { ...process.env, INIT_CWD: undefined, npm_command: undefined, SKILL_RAILS_STATE_DIR: path.join(cwd, 'state') },
+    env: { ...process.env, INIT_CWD: undefined, npm_command: undefined, SKILL_RAILS_COMMAND: undefined, SKILL_RAILS_STATE_DIR: path.join(cwd, 'state') },
   });
   return { code: result.status, json: JSON.parse(result.stdout) };
 }
@@ -34,6 +34,12 @@ describe('the CLI', () => {
     expect(fs.readFileSync(path.join(project, 'location'), 'utf8').trim()).toBe(fs.realpathSync(project));
     expect(cli(['status', 'explicit', '--cwd', project], { cwd: launch }).json.status).toBe('done');
     expect(cli(['check', 'rails.yaml', '--cwd', project], { cwd: launch }).json.status).toBe('ok');
+  });
+
+  it('gives a next command that runs the same build with node', () => {
+    const dir = tempDir({ 'rails.yaml': 'name: cli\nsteps:\n  - id: a\n    prompt: p\n' });
+    const { next } = cli(['start', 'rails.yaml'], { cwd: dir }).json;
+    expect(next.startsWith(`node ${fs.realpathSync(bin)} done cli a`)).toBe(true);
   });
 
   it('rejects a missing project directory', () => {

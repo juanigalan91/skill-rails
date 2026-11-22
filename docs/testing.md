@@ -2,7 +2,7 @@
 
 `skill-rails test` runs a rails file for real, with fixed answers in place of the agent.
 It finds the `*.test.yaml` files in all folders below its targets (not in `node_modules`, `.git`, `dist`, `coverage` or `.nx`), so a repository with many skills needs no script: put `skill-rails test . --quiet` in its test command.
-Fixed-answer tests need no model or API key. Commands still run for real: use fixtures and stubs to keep tests repeatable and avoid network calls.
+Fixed-answer tests need no model or API key. Commands run for real, unless a fixed answer replaces them: use fixtures and stubs to keep tests repeatable and avoid network calls.
 
 ```bash
 skill-rails test                      # every *.test.yaml under the current folder
@@ -134,6 +134,20 @@ esac
 ```
 
 Use an environment variable to choose a scenario, for example `GH_SCENARIO: failing`.
+
+## Fixed answers of run steps
+
+A fixed answer can also replace a `run` step or an `sh` call: the command does not run, and the answer gives its outputs.
+Use it for a script of a nested rails file that a stub cannot replace easily, for example a script that runs the checks of the repository.
+
+```yaml
+answers:
+  validate/run: { results: [{ command: npm test, result: passed }] }   # the outputs of the step
+  push: { $fail: 'rejected: non-fast-forward' }                      # the step fails with this error
+```
+
+The key of a step of a nested run is `<uses id>/<step id>`; a bare step id answers only a step of the tested rails file, so that it cannot hide an agent step with the same id.
+A list gives one answer for each run of the step, and `$files` writes files, as for an agent step.
 
 ## What a test does not check
 
@@ -275,5 +289,5 @@ variants:
 For a fair comparison, use the same model, request and fixture for all the variants, and at least 10 runs.
 Isolate the agent: `claude -p --output-format json --strict-mcp-config --setting-sources project --plugin-dir <variant>` loads only the plugins of the variant, with no user MCP server and no user settings.
 A user MCP server can also keep `claude -p` open after its answer.
-To run a local build of skill-rails, set `SKILL_RAILS_COMMAND` (for example `node <checkout>/bin/skill-rails.js`): the `next` command of each report then uses it.
+The `next` command of each report runs the same build with `node`, which starts faster than `npx`; set `SKILL_RAILS_COMMAND` to use another command, for example `node <checkout>/bin/skill-rails.js`.
 A YAML and a TS variant give the agent the same reports: the difference between them shows the noise of the measure.

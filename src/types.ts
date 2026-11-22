@@ -283,6 +283,8 @@ export interface RunOptions {
   dir: string;
   cwd: string;
   timeoutMs?: number;
+  /** The step id, after the ids of the uses steps around it: `<uses id>/<step id>`. */
+  step?: string;
 }
 
 export interface RunResult {

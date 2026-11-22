@@ -15,7 +15,7 @@ export interface HookInput {
 
 /** The question tools of the hosts: Claude Code, then Codex. */
 export const QUESTION_TOOLS = /^(AskUserQuestion|request_user_input)$/;
-const DONE_COMMAND = /skill-rails(?:@\S+|\.js)?\s+done\s+(\S+)\s+(\S+)/;
+const DONE_COMMAND = /skill-rails(?:@\S+|\.js)?['"]?\s+done\s+(\S+)\s+(\S+)/;
 const DONE_TOOL = /rails_done$/;
 
 const unquote = (word: string) => word.replace(/^['"]|['"]$/g, '');

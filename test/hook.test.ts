@@ -31,7 +31,7 @@ beforeEach(() => {
 });
 
 const bash = (command: string) => hook({ cwd, hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_input: { command } });
-const doneCommand = () => `npx -y skill-rails@0.5 done confirm pick --cwd '${cwd}' --output - <<'JSON'\n{}\nJSON`;
+const doneCommand = () => `npx -y skill-rails@0.6 done confirm pick --cwd '${cwd}' --output - <<'JSON'\n{}\nJSON`;
 
 describe('host hook', () => {
   it('denies the done call of an ask step before the question tool runs', () => {
@@ -42,10 +42,15 @@ describe('host hook', () => {
     expect(JSON.parse(mcp).hookSpecificOutput.permissionDecision).toBe('deny');
   });
 
+  it('reads a done call of a node command with a quoted path', () => {
+    const command = `node '/a b/bin/skill-rails.js' done confirm pick --cwd '${cwd}' --output - <<'JSON'\n{}\nJSON`;
+    expect(JSON.parse(bash(command)).hookSpecificOutput.permissionDecision).toBe('deny');
+  });
+
   it('lets other commands, other steps and a --fail go on', () => {
     expect(bash('git status')).toBe('');
-    expect(bash('npx -y skill-rails@0.5 done confirm other')).toBe('');
-    expect(bash('npx -y skill-rails@0.5 done confirm pick --fail "no user"')).toBe('');
+    expect(bash('npx -y skill-rails@0.6 done confirm other')).toBe('');
+    expect(bash('npx -y skill-rails@0.6 done confirm pick --fail "no user"')).toBe('');
   });
 
   it('records the Claude Code answers, then lets the call go on and checks the reported answers', () => {
@@ -86,7 +91,7 @@ describe('host hook', () => {
     expect(bash(doneCommand())).toBe('');
     const denied = hook({ cwd: other, hook_event_name: 'PreToolUse', tool_name: 'mcp__rails__rails_done', tool_input: { rails: 'confirm', step: 'pick' } });
     expect(JSON.parse(denied).hookSpecificOutput.permissionDecision).toBe('deny');
-    expect(JSON.parse(bash(`npx -y skill-rails@0.5 done confirm pick --cwd '${other}'`)).hookSpecificOutput.permissionDecision).toBe('deny');
+    expect(JSON.parse(bash(`npx -y skill-rails@0.6 done confirm pick --cwd '${other}'`)).hookSpecificOutput.permissionDecision).toBe('deny');
   });
 
   it('does not use proposed answers from the tool input as user answers', () => {
