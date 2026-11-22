@@ -80,7 +80,7 @@ export function stdoutOutputs(stdout: string, mode: RunOptions['stdout']): Recor
   return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : { value };
 }
 
-/** The scripts/ folder of the plugin that holds the flow: the nearest folder above it with a plugin manifest. */
+/** The scripts/ folder of the plugin that holds the rails file: the nearest folder above it with a plugin manifest. */
 function pluginScripts(dir: string): string | null {
   for (let current = path.dirname(dir); ; current = path.dirname(current)) {
     if (PLUGIN_MANIFESTS.some((manifest) => fs.existsSync(path.join(current, manifest)))) {
@@ -95,7 +95,7 @@ function pluginScripts(dir: string): string | null {
 const envValue = (value: unknown): string => (Array.isArray(value) ? value.map(text).join('\n') : text(value));
 
 export function runCommand(command: string, { env = {}, args = [], stdout, dir, cwd, timeoutMs = TIMEOUT_MS }: RunOptions): RunResult {
-  // In the runner folder: a flow that sets TMPDIR to the project must not see this file.
+  // In the runner folder: a rails file that sets TMPDIR to the project must not see this file.
   const outputDir = path.join(stateDir(), 'outputs');
   fs.mkdirSync(outputDir, { recursive: true });
   const outputFile = path.join(outputDir, `skill-rails-output-${crypto.randomUUID()}`);
@@ -109,9 +109,9 @@ export function runCommand(command: string, { env = {}, args = [], stdout, dir, 
     env: {
       ...process.env,
       ...values,
-      FLOW_DIR: dir,
-      FLOW_OUTPUT: outputFile,
-      // scripts/ next to the flow file comes first, then scripts/ of its plugin, so that a step can be `run: build.sh`.
+      RAILS_DIR: dir,
+      RAILS_OUTPUT: outputFile,
+      // scripts/ next to the rails file comes first, then scripts/ of its plugin, so that a step can be `run: build.sh`.
       PATH: paths.join(path.delimiter),
     },
     encoding: 'utf8',

@@ -7,7 +7,7 @@ import { lastJson, loadTests, runTest, runTests, type Agent } from '../src/testi
 import type { Report } from '../src/types.js';
 import { tempDir } from './helpers.js';
 
-const FLOW = `
+const RAILS = `
 name: t
 steps:
   - id: write
@@ -24,8 +24,8 @@ steps:
   - stop: '\${{ steps.write.outputs.title }}'
 `;
 
-function testOf(body: string, flow = FLOW) {
-  const dir = tempDir({ 'rails.yaml': flow, 'tests/t.test.yaml': `flow: ../rails.yaml\n${body}` });
+function testOf(body: string, rails = RAILS) {
+  const dir = tempDir({ 'rails.yaml': rails, 'tests/t.test.yaml': `rails: ../rails.yaml\n${body}` });
   return loadTests(path.join(dir, 'tests', 't.test.yaml'))[0]!;
 }
 
@@ -76,7 +76,7 @@ describe('live steps', () => {
   });
 
   it('does not fail a run where all tests are skipped', () => {
-    const dir = tempDir({ 'rails.yaml': FLOW, 'tests/t.test.yaml': 'flow: ../rails.yaml\nmode: agent\nrequest: Do it.\n' });
+    const dir = tempDir({ 'rails.yaml': RAILS, 'tests/t.test.yaml': 'rails: ../rails.yaml\nmode: agent\nrequest: Do it.\n' });
     expect(runTests([dir]).every((r) => r.passed && r.skipped)).toBe(true);
   });
 
@@ -111,12 +111,12 @@ describe('judge', () => {
 describe('agent mode', () => {
   const SIMPLE = 'name: simple\nsteps:\n  - id: write\n    prompt: Write a title.\n    output: { type: object, properties: { title: { type: string } } }\n  - stop: Done.\n';
 
-  /** A fake agent that runs the flow through the API, as a real agent runs the CLI. */
+  /** A fake agent that runs the skill through the API, as a real agent runs the CLI. */
   const runner: Agent = (prompt, cwd) => {
     const file = /run (\S+)/.exec(prompt)?.[1] as string;
     let report: Report = start({ file, cwd });
-    while (report.status === 'step') report = done({ flow: report.flow, id: report.id, output: { title: 'x' }, cwd });
-    return `I ran the flow. Finished: ${(report as { message: string }).message}`;
+    while (report.status === 'step') report = done({ rails: report.rails, id: report.id, output: { title: 'x' }, cwd });
+    return `I ran the skill. Finished: ${(report as { message: string }).message}`;
   };
 
   it('checks the saved state and the transcript', () => {
@@ -127,7 +127,7 @@ describe('agent mode', () => {
     expect(runTest(test, { live: true, agent: runner }).failures).toEqual([]);
   });
 
-  it('reports a flow that the agent did not start', () => {
+  it('reports a run that the agent did not start', () => {
     const test = testOf('mode: agent\nrequest: hello\nexpect:\n  started: true\n  transcript: { contains: [Finished] }\n', SIMPLE);
     expect(runTest(test, { live: true, agent: () => 'Hello!' }).failures).toEqual(['started: expected true, got false', 'transcript: does not contain "Finished"']);
     const negative = testOf('mode: agent\nrequest: hello\nexpect: { started: false }\n', SIMPLE);
@@ -142,7 +142,7 @@ inputs:
   topic: { type: string, default: docs }
 steps:
   - id: list
-    run: echo 'items=["a","b"]' >> "$FLOW_OUTPUT"
+    run: echo 'items=["a","b"]' >> "$RAILS_OUTPUT"
   - id: each
     foreach: \${{ fromJSON(steps.list.outputs.items) }}
     steps:
@@ -164,20 +164,20 @@ steps:
   let cwd: string;
 
   beforeEach(() => {
-    dir = tempDir({ 'flow/rails.yaml': MAIN, 'flow/sub.yaml': SUB });
+    dir = tempDir({ 'rails/rails.yaml': MAIN, 'rails/sub.yaml': SUB });
     cwd = tempDir();
     process.env.SKILL_RAILS_STATE_DIR = tempDir();
-    let report: Report = start({ file: path.join(dir, 'flow', 'rails.yaml'), cwd, inputs: { topic: 'api' } });
+    let report: Report = start({ file: path.join(dir, 'rails', 'rails.yaml'), cwd, inputs: { topic: 'api' } });
     const outputs = [{ fix: true }, { fix: false }, { note: 'ok' }, { answer: 'Yes' }];
-    for (const output of outputs) report = done({ flow: 'main', id: (report as { id: string }).id, output, cwd });
+    for (const output of outputs) report = done({ rails: 'main', id: (report as { id: string }).id, output, cwd });
     expect(report).toMatchObject({ status: 'done', message: 'Shipped.' });
   });
 
   it('records a run as a test that passes', () => {
-    const out = path.join(dir, 'flow', 'tests', 'main.test.yaml');
-    const test = record({ flow: 'main', cwd, out });
+    const out = path.join(dir, 'rails', 'tests', 'main.test.yaml');
+    const test = record({ rails: 'main', cwd, out });
     expect(test).toEqual({
-      flow: '../rails.yaml',
+      rails: '../rails.yaml',
       inputs: { topic: 'api' },
       answers: { decide: [{ fix: true }, { fix: false }], 'sub/decide': { note: 'ok' }, pick: { answer: 'Yes' } },
       expect: { status: 'done', message: 'Shipped.', steps: { list: 'success', each: 'success', sub: 'success', pick: 'success' } },
@@ -188,9 +188,9 @@ steps:
   });
 
   it('prints one trace line per agent step', () => {
-    const lines = trace({ flow: 'main', cwd });
+    const lines = trace({ rails: 'main', cwd });
     expect(lines.map((line) => line.path)).toEqual(['decide', 'decide', 'sub/decide', 'pick']);
-    expect(lines[0]).toMatchObject({ flow: 'main', id: 'decide', request: { type: 'prompt', instructions: 'Decide about a.' }, answer: { fix: true }, outcome: 'success' });
+    expect(lines[0]).toMatchObject({ rails: 'main', id: 'decide', request: { type: 'prompt', instructions: 'Decide about a.' }, answer: { fix: true }, outcome: 'success' });
     expect(lines[3]).toMatchObject({ request: { type: 'ask' }, answer: { answer: 'Yes' } });
   });
 });
@@ -201,11 +201,11 @@ describe('recording interrupted loops', () => {
     const dir = tempDir({ 'rails.yaml': `name: interrupted\nsteps:\n  - id: loop\n    ${loop}\n    steps:\n      - id: answer\n        prompt: Answer.\n` });
     process.env.SKILL_RAILS_STATE_DIR = tempDir();
     start({ file: path.join(dir, 'rails.yaml'), cwd: dir });
-    done({ flow: 'interrupted', id: 'answer', output: { ok: true }, cwd: dir });
-    expect(done({ flow: 'interrupted', id: 'answer', fail: 'Cannot complete.', cwd: dir })).toMatchObject({ status: 'failed' });
-    expect(trace({ flow: 'interrupted', cwd: dir }).map((line) => line.answer)).toEqual([{ ok: true }, { $fail: 'Cannot complete.' }]);
+    done({ rails: 'interrupted', id: 'answer', output: { ok: true }, cwd: dir });
+    expect(done({ rails: 'interrupted', id: 'answer', fail: 'Cannot complete.', cwd: dir })).toMatchObject({ status: 'failed' });
+    expect(trace({ rails: 'interrupted', cwd: dir }).map((line) => line.answer)).toEqual([{ ok: true }, { $fail: 'Cannot complete.' }]);
     const out = path.join(dir, 'replay.test.yaml');
-    fs.writeFileSync(out, yaml.dump(record({ flow: 'interrupted', cwd: dir, out })));
+    fs.writeFileSync(out, yaml.dump(record({ rails: 'interrupted', cwd: dir, out })));
     expect(runTest(loadTests(out)[0]!).failures).toEqual([]);
   });
 
@@ -213,17 +213,17 @@ describe('recording interrupted loops', () => {
     const dir = tempDir({ 'rails.yaml': 'name: stopped\nsteps:\n  - id: loop\n    foreach: [a, b]\n    steps:\n      - id: answer\n        prompt: Answer.\n      - stop: Enough.\n' });
     process.env.SKILL_RAILS_STATE_DIR = tempDir();
     start({ file: path.join(dir, 'rails.yaml'), cwd: dir });
-    expect(done({ flow: 'stopped', id: 'answer', output: { ok: true }, cwd: dir })).toMatchObject({ status: 'done', message: 'Enough.' });
-    expect(trace({ flow: 'stopped', cwd: dir })).toHaveLength(1);
+    expect(done({ rails: 'stopped', id: 'answer', output: { ok: true }, cwd: dir })).toMatchObject({ status: 'done', message: 'Enough.' });
+    expect(trace({ rails: 'stopped', cwd: dir })).toHaveLength(1);
   });
 
   it('replays array-valued agent outputs from a recording', () => {
     const dir = tempDir({ 'rails.yaml': 'name: arrays\nsteps:\n  - id: answer\n    prompt: List titles.\n    output: { type: array, items: { type: string } }\n' });
     process.env.SKILL_RAILS_STATE_DIR = tempDir();
     start({ file: path.join(dir, 'rails.yaml'), cwd: dir });
-    expect(done({ flow: 'arrays', id: 'answer', output: ['one', 'two'], cwd: dir })).toMatchObject({ status: 'done' });
+    expect(done({ rails: 'arrays', id: 'answer', output: ['one', 'two'], cwd: dir })).toMatchObject({ status: 'done' });
     const out = path.join(dir, 'replay.test.yaml');
-    fs.writeFileSync(out, yaml.dump(record({ flow: 'arrays', cwd: dir, out })));
+    fs.writeFileSync(out, yaml.dump(record({ rails: 'arrays', cwd: dir, out })));
     expect(runTest(loadTests(out)[0]!).failures).toEqual([]);
   });
 });

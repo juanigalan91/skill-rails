@@ -13,52 +13,52 @@ const reply = (result: Report) => ({
 });
 
 const LOOP =
-  'Act on the status of the result: step → do the step, then call flow_done; invalid → correct the output and call flow_done again; done or failed → tell the user the message.';
+  'Act on the status of the result: step → do the step, then call rails_done; invalid → correct the output and call rails_done again; done or failed → tell the user the message.';
 
 export function createServer({ cwd = process.cwd() }: { cwd?: string } = {}): McpServer {
   const server = new McpServer({ name: 'skill-rails', version: VERSION });
 
   server.registerTool(
-    'flow_start',
+    'rails_start',
     {
-      description: `Start a skill-rails flow: check the flow file, reset its state, and get the first step to do. ${LOOP}`,
+      description: `Start a skill-rails run: check the rails file, reset the state of the run, and get the first step to do. ${LOOP}`,
       inputSchema: {
-        file: z.string().describe('Path of the flow YAML file.'),
-        inputs: z.record(z.string(), z.union([z.string(), z.boolean(), z.number(), z.array(z.string())])).optional().describe('The flow inputs.'),
+        file: z.string().describe('Path of the rails.yaml file.'),
+        inputs: z.record(z.string(), z.union([z.string(), z.boolean(), z.number(), z.array(z.string())])).optional().describe('The inputs of the rails file.'),
       },
     },
     async ({ file, inputs }) => reply(start({ file: path.resolve(cwd, file), inputs, cwd })),
   );
 
   server.registerTool(
-    'flow_done',
+    'rails_done',
     {
-      description: `Report the output of the current step of a flow, and get the next step. Give fail instead of output when you cannot do the step. ${LOOP}`,
+      description: `Report the output of the current step of a run, and get the next step. Give fail instead of output when you cannot do the step. ${LOOP}`,
       inputSchema: {
-        flow: z.string().describe('The flow name.'),
+        rails: z.string().describe('The rails name: the name in the rails file.'),
         step: z.string().describe('The id of the current step.'),
         output: z.record(z.string(), z.unknown()).optional().describe('The output, matching the output schema of the step.'),
-        fail: z.string().optional().describe('The reason why the step cannot be done. It ends the flow.'),
+        fail: z.string().optional().describe('The reason why the step cannot be done. It ends the run.'),
       },
     },
-    async ({ flow, step, output, fail }) => reply(done({ flow, id: step, output, fail, cwd })),
+    async ({ rails, step, output, fail }) => reply(done({ rails, id: step, output, fail, cwd })),
   );
 
   server.registerTool(
-    'flow_status',
-    { description: 'Get the current step of a flow again, with the results of the steps so far.', inputSchema: { flow: z.string() } },
-    async ({ flow }) => reply(status({ flow, cwd })),
+    'rails_status',
+    { description: 'Get the current step of a run again, with the results of the steps so far.', inputSchema: { rails: z.string() } },
+    async ({ rails }) => reply(status({ rails, cwd })),
   );
 
   server.registerTool(
-    'flow_reset',
-    { description: 'Delete the state of a flow.', inputSchema: { flow: z.string() } },
-    async ({ flow }) => reply(reset({ flow, cwd })),
+    'rails_reset',
+    { description: 'Delete the state of a run.', inputSchema: { rails: z.string() } },
+    async ({ rails }) => reply(reset({ rails, cwd })),
   );
 
   server.registerTool(
-    'flow_check',
-    { description: 'Check a flow file without running it.', inputSchema: { file: z.string() } },
+    'rails_check',
+    { description: 'Check a rails file without running it.', inputSchema: { file: z.string() } },
     async ({ file }) => reply(check({ file: path.resolve(cwd, file), cwd })),
   );
 

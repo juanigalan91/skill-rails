@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import { Ajv, type ErrorObject } from 'ajv';
 import type { JsonObject } from './types.js';
 
-export const schema = JSON.parse(fs.readFileSync(new URL('../schema/flow.schema.json', import.meta.url), 'utf8')) as JsonObject & {
+export const schema = JSON.parse(fs.readFileSync(new URL('../schema/rails.schema.json', import.meta.url), 'utf8')) as JsonObject & {
   $id: string;
   properties: JsonObject;
 };
@@ -19,7 +19,7 @@ export const formatErrors = (prefix: string, errors: ErrorObject[] | null | unde
 // strictSchema refuses unknown keywords: a YAML flow map with a comma in a description splits it into stray keys.
 const strict = new Ajv({ allErrors: true, strict: false, strictSchema: true });
 
-/** The problems of an output schema, found before the flow runs. */
+/** The problems of an output schema, found before the run. */
 export function checkOutputSchema(outputSchema: JsonObject): string[] {
   try {
     strict.compile(outputSchema);

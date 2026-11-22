@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import yml from 'eslint-plugin-yml';
 import jsonSchemaValidator from 'eslint-plugin-json-schema-validator';
 
-const schema = JSON.parse(fs.readFileSync(new URL('./schema/flow.schema.json', import.meta.url), 'utf8'));
+const schema = JSON.parse(fs.readFileSync(new URL('./schema/rails.schema.json', import.meta.url), 'utf8'));
 
 export default [
   { ignores: ['node_modules/**', 'dist/**', '.yarn/**', 'coverage/**'] },

@@ -1,12 +1,12 @@
 {
   "name": "skill-rails",
-  "description": "Deterministic YAML flows for agent skills: run, create and migrate skills to skill-rails",
-  "version": "0.3.1",
+  "description": "Deterministic YAML rails for agent skills: run, create and migrate skills to skill-rails",
+  "version": "0.4.0",
   "license": "MIT",
   "keywords": [
     "skills",
     "workflow",
-    "flow",
+    "rails",
     "deterministic"
   ],
   "author": {

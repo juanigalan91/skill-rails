@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.4.0
+
+- `set` takes one expression that gives an object: each key becomes an output.
+- The question hook (`hooks/hooks.json`, `skill-rails hook`, `skill-rails hooks`): records native question-tool answers on Claude Code and Codex, guards supported completion calls, and rejects changed answers. Hooks must be enabled and trusted; they are not a security boundary.
+- Breaking: "flow" becomes "rails" everywhere, with no alias.
+  The expression context `flow` is `rails`: `${{ rails.name }}` and `${{ rails.dir }}`.
+  The `flow` field of the reports and of the trace lines is `rails`.
+  The MCP tools are `rails_start`, `rails_done`, `rails_status`, `rails_reset` and `rails_check`, and their `flow` parameter is `rails`.
+  The CLI takes `<rails>` in place of `<flow>`.
+  In a test file, `flow:` is `rails:` and `flow-outputs` is `rails-outputs`.
+  `$FLOW_OUTPUT` and `$FLOW_DIR` are `$RAILS_OUTPUT` and `$RAILS_DIR`.
+  `schema/flow.schema.json` is `schema/rails.schema.json`.
+  The API takes `rails` in place of `flow`, for example `done({ rails, id, output })`, and exports `loadRails`, `validateRails` and `RailsError`.
+- Upgrade: restart runs saved by 0.3.x and update plugin/MCP commands to `skill-rails@0.4`; old saved states and renamed fields have no compatibility aliases.
+- Relative Markdown links in prompts point to files next to the prompt: the runner makes them absolute, and `check` reports broken links.
+- `run` `args` takes one value in place of a list: `args: ${{ item.dir }}`.
+- `with` on `prompt` steps: named values that the agent gets as a YAML block after the instructions.
+  A `skill` step `with` can also be a map, which the agent gets as YAML arguments.
+
 ## 0.3.1
 
 - Add schema-aware YAML linting through ESLint, using the existing workflow schema to reject unknown keys and invalid types.

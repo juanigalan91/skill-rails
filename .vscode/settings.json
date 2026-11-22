@@ -2,7 +2,7 @@
   "eslint.validate": ["yaml"],
   "yaml.validate": true,
   "yaml.schemas": {
-    "./schema/flow.schema.json": [
+    "./schema/rails.schema.json": [
       "**/rails.yaml",
       "**/rails.yml",
       "skills/**/*.yaml",

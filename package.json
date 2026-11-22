@@ -1,7 +1,7 @@
 {
   "name": "skill-rails",
-  "version": "0.3.1",
-  "description": "Deterministic, testable YAML flows for AI agent skills, in GitHub Actions syntax.",
+  "version": "0.4.0",
+  "description": "Deterministic, testable YAML rails for AI agent skills, in GitHub Actions syntax.",
   "type": "module",
   "license": "MIT",
   "bin": "bin/skill-rails.js",
@@ -10,7 +10,7 @@
       "types": "./dist/api.d.ts",
       "import": "./dist/api.js"
     },
-    "./schema": "./schema/flow.schema.json"
+    "./schema": "./schema/rails.schema.json"
   },
   "files": [
     "bin",
@@ -20,6 +20,7 @@
     "docs",
     "examples",
     ".claude-plugin",
+    "hooks",
     ".mcp.json",
     "plugin.json",
     "mcp.json",
@@ -30,9 +31,9 @@
     "node": ">=20"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "node -e \"require('node:fs').rmSync('dist', {recursive: true, force: true})\" && tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.test.json",
-    "test": "yarn build && vitest run",
+    "test": "yarn build && vitest run --maxWorkers=4",
     "prepack": "yarn build",
     "prepublishOnly": "yarn lint && yarn typecheck && yarn test",
     "lint": "eslint \"**/*.{yaml,yml}\" --max-warnings 0"

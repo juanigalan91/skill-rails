@@ -1,4 +1,4 @@
-flow: ../rails.yaml
+rails: ../rails.yaml
 git: false
 tests:
   - name: a confirmed protected ID is kept, a refused one is skipped
@@ -7,13 +7,13 @@ tests:
       confirm: [{ ok: Yes — read it }, { ok: 'No' }]
     expect:
       status: done
-      flow-outputs: { ids: [SEC-1, APP-7], skipped: [SEC-2] }
+      rails-outputs: { ids: [SEC-1, APP-7], skipped: [SEC-2] }
   - name: an unattended run asks nothing and skips the protected IDs
     inputs: { text: 'SEC-1 APP-7', auto: true }
     expect:
       steps: { protected: skipped }
-      flow-outputs: { ids: [APP-7] }
-  - name: with required, no ID fails the flow
+      rails-outputs: { ids: [APP-7] }
+  - name: with required, no ID fails the run
     inputs: { text: 'nothing here', required: true }
     expect:
       status: failed

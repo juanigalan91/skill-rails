@@ -16,14 +16,14 @@ describe('parseWarnings', () => {
 
 describe('runCommand', () => {
   it('passes env values, puts scripts/ in PATH, and reads the outputs', () => {
-    const dir = tempDir({ 'scripts/hello.sh': '#!/usr/bin/env bash\necho "msg=hi $WHO" >> "$FLOW_OUTPUT"\necho "::warning::careful"\n' });
+    const dir = tempDir({ 'scripts/hello.sh': '#!/usr/bin/env bash\necho "msg=hi $WHO" >> "$RAILS_OUTPUT"\necho "::warning::careful"\n' });
     const result = runCommand('hello.sh', { env: { WHO: 'you' }, dir, cwd: dir });
     expect(result).toMatchObject({ outcome: 'success', exitCode: 0, outputs: { msg: 'hi you' }, warnings: ['careful'] });
   });
 
   it('gives a list as one line per item', () => {
     const dir = tempDir();
-    const result = runCommand('echo "count=$(printf "%s\\n" "$ITEMS" | wc -l | tr -d " ")" >> "$FLOW_OUTPUT"', { env: { ITEMS: ['a', 'b', 'c'] }, dir, cwd: dir });
+    const result = runCommand('echo "count=$(printf "%s\\n" "$ITEMS" | wc -l | tr -d " ")" >> "$RAILS_OUTPUT"', { env: { ITEMS: ['a', 'b', 'c'] }, dir, cwd: dir });
     expect(result.outputs.count).toBe('3');
   });
 

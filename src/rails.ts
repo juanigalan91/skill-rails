@@ -1,4 +1,4 @@
-// Loads a flow file: YAML, schema check, prompt files, sub-flows, step ids and expressions.
+// Loads a rails file: YAML, schema check, prompt files, nested rails files, step ids and expressions.
 import { outputSchema } from './compact.js';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -6,13 +6,13 @@ import yaml from 'js-yaml';
 import type { ValidateFunction } from 'ajv';
 import { ajv, checkOutputSchema, formatErrors, schema } from './schema.js';
 import { parse, sourcesOf } from './expressions.js';
-import { resolveSkillFlow } from './skills.js';
-import type { Flow, ForeachStep, RepeatStep, Step, StepKind, UsesStep, JsonObject } from './types.js';
+import { resolveSkillRails } from './skills.js';
+import type { Rails, ForeachStep, RepeatStep, Step, StepKind, UsesStep, JsonObject } from './types.js';
 
 const KEYED_KINDS = ['run', 'skill', 'ask', 'stop', 'fail', 'note', 'set', 'foreach', 'repeat', 'uses', 'break'] as const;
 const ALL_KINDS: StepKind[] = ['run', 'skill', 'prompt', 'ask', 'stop', 'fail', 'note', 'set', 'foreach', 'repeat', 'uses', 'break'];
 
-export class FlowError extends Error {
+export class RailsError extends Error {
   constructor(readonly errors: string[]) {
     super(errors.join('\n'));
   }
@@ -57,13 +57,13 @@ function validateSteps(steps: unknown[], at: string, errors: string[], ids: stri
   });
 }
 
-/** Checks a parsed flow. Returns the errors. */
-export function validateFlow(flow: unknown): string[] {
-  if (!topLevel(flow)) return formatErrors('', topLevel.errors);
+/** Checks a parsed rails file. Returns the errors. */
+export function validateRails(rails: unknown): string[] {
+  if (!topLevel(rails)) return formatErrors('', topLevel.errors);
   const errors: string[] = [];
   const ids: string[] = [];
-  validateSteps((flow as { steps: unknown[] }).steps, '/steps', errors, ids);
-  const onFailure = (flow as { 'on-failure'?: unknown[] })['on-failure'];
+  validateSteps((rails as { steps: unknown[] }).steps, '/steps', errors, ids);
+  const onFailure = (rails as { 'on-failure'?: unknown[] })['on-failure'];
   if (onFailure) validateSteps(onFailure, '/on-failure', errors, ids);
   for (const id of new Set(ids.filter((id, i) => ids.indexOf(id) !== i))) errors.push(`step id "${id}" is used twice`);
   return errors;
@@ -79,8 +79,8 @@ function checkExpressions(value: unknown, at: string, key: string | undefined, e
   }
   if (value && typeof value === 'object') {
     for (const [childKey, child] of Object.entries(value)) {
-      // A run command holds no expression, and a loaded sub-flow was checked when it was loaded.
-      if (childKey !== 'run' && childKey !== 'flow') checkExpressions(child, `${at}/${childKey}`, childKey, errors);
+      // A run command holds no expression, and a loaded nested rails file was checked when it was loaded.
+      if (childKey !== 'run' && childKey !== 'rails') checkExpressions(child, `${at}/${childKey}`, childKey, errors);
     }
   }
 }
@@ -88,16 +88,47 @@ function checkExpressions(value: unknown, at: string, key: string | undefined, e
 /** A prompt that is one word ending with .md is the path of a Markdown file; any other text is the instructions. */
 export const isPromptFile = (prompt: unknown): prompt is string => typeof prompt === 'string' && /^\S+\.md$/.test(prompt.trim());
 
-/** Reads the prompt files and loads the sub-flows of a list of steps, recursively. */
+const LINK = /\]\(([^)\s]+)\)/g;
+
+/** Relative Markdown link targets, made absolute from the folder of the prompt; a missing file is an error. */
+export function resolveLinks(text: string, base: string, problems: string[] = []): string {
+  // Code blocks keep their text: a link there is an example.
+  return text.split(/(^```[\s\S]*?^```)/m).map((part) => (part.startsWith('```') ? part : resolvePart(part, base, problems))).join('');
+}
+
+function resolvePart(text: string, base: string, problems: string[]): string {
+  return text.replace(LINK, (whole, target: string) => {
+    if (/^([a-z][a-z0-9+.-]*:|\/|#|~|\$\{\{)/i.test(target)) return whole;
+    const hash = target.indexOf('#');
+    const file = hash < 0 ? target : target.slice(0, hash);
+    const anchor = hash < 0 ? '' : target.slice(hash);
+    const absolute = path.resolve(base, decodeURI(file));
+    if (!fs.existsSync(absolute)) problems.push(`broken link ${target}`);
+    return `](${absolute}${anchor})`;
+  });
+}
+
+function linked(text: string, base: string, id: string | undefined, errors: string[]): string {
+  const problems: string[] = [];
+  const result = resolveLinks(text, base, problems);
+  errors.push(...problems.map((problem) => `step "${id}": ${problem}`));
+  return result;
+}
+
+/** Reads the prompt files and loads the nested rails files of a list of steps, recursively. */
 function prepareSteps(steps: Step[], dir: string, errors: string[], loading: string[], cwd: string): void {
   for (const step of steps) {
     const withPrompt = step as Step & { prompt?: string };
     if (isPromptFile(withPrompt.prompt)) {
+      const file = path.resolve(dir, withPrompt.prompt);
       try {
-        withPrompt.prompt = fs.readFileSync(path.resolve(dir, withPrompt.prompt), 'utf8');
+        withPrompt.prompt = fs.readFileSync(file, 'utf8');
       } catch (error) {
         errors.push(`step "${step.id}": cannot read ${withPrompt.prompt}: ${(error as Error).message}`);
       }
+      if (withPrompt.prompt !== undefined && !isPromptFile(withPrompt.prompt)) withPrompt.prompt = linked(withPrompt.prompt, path.dirname(file), step.id, errors);
+    } else if (typeof withPrompt.prompt === 'string') {
+      withPrompt.prompt = linked(withPrompt.prompt, dir, step.id, errors);
     }
     const withOutput = step as Step & { output?: unknown };
     if (withOutput.output !== undefined) {
@@ -113,41 +144,41 @@ function prepareSteps(steps: Step[], dir: string, errors: string[], loading: str
     if (kind === 'uses') {
       const uses = step as UsesStep;
       try {
-        const file = uses.uses.startsWith('skill:') ? resolveSkillFlow(uses.uses.slice('skill:'.length), dir, { cwd }) : path.resolve(dir, uses.uses);
-        uses.flow = loadFile(file, loading, cwd);
+        const file = uses.uses.startsWith('skill:') ? resolveSkillRails(uses.uses.slice('skill:'.length), dir, { cwd }) : path.resolve(dir, uses.uses);
+        uses.rails = loadFile(file, loading, cwd);
       } catch (error) {
-        const inner = (error as FlowError).errors ?? [(error as Error).message];
+        const inner = (error as RailsError).errors ?? [(error as Error).message];
         errors.push(...inner.map((line) => `step "${uses.id}" (${uses.uses}): ${line}`));
       }
     }
   }
 }
 
-function loadFile(file: string, loading: string[], cwd: string): Flow {
+function loadFile(file: string, loading: string[], cwd: string): Rails {
   const resolved = path.resolve(file);
   if (loading.includes(resolved)) {
-    throw new FlowError([`the flows use each other: ${[...loading, resolved].map((f) => path.basename(path.dirname(f)) + '/' + path.basename(f)).join(' → ')}`]);
+    throw new RailsError([`the rails files use each other: ${[...loading, resolved].map((f) => path.basename(path.dirname(f)) + '/' + path.basename(f)).join(' → ')}`]);
   }
   let raw: unknown;
   try {
     raw = yaml.load(fs.readFileSync(resolved, 'utf8'));
   } catch (error) {
-    throw new FlowError([`cannot read ${file}: ${(error as Error).message}`]);
+    throw new RailsError([`cannot read ${file}: ${(error as Error).message}`]);
   }
-  const errors = validateFlow(raw);
-  if (errors.length) throw new FlowError(errors);
-  const flow = raw as Omit<Flow, 'dir'>;
+  const errors = validateRails(raw);
+  if (errors.length) throw new RailsError(errors);
+  const rails = raw as Omit<Rails, 'dir'>;
   const dir = path.dirname(resolved);
-  prepareSteps(flow.steps, dir, errors, [...loading, resolved], cwd);
-  if (flow['on-failure']) prepareSteps(flow['on-failure'], dir, errors, [...loading, resolved], cwd);
-  checkExpressions(flow.steps, '/steps', undefined, errors);
-  checkExpressions(flow['on-failure'], '/on-failure', undefined, errors);
-  checkExpressions(flow.outputs, '/outputs', undefined, errors);
-  if (errors.length) throw new FlowError(errors);
-  return { ...flow, inputs: flow.inputs ?? {}, dir };
+  prepareSteps(rails.steps, dir, errors, [...loading, resolved], cwd);
+  if (rails['on-failure']) prepareSteps(rails['on-failure'], dir, errors, [...loading, resolved], cwd);
+  checkExpressions(rails.steps, '/steps', undefined, errors);
+  checkExpressions(rails['on-failure'], '/on-failure', undefined, errors);
+  checkExpressions(rails.outputs, '/outputs', undefined, errors);
+  if (errors.length) throw new RailsError(errors);
+  return { ...rails, inputs: rails.inputs ?? {}, dir };
 }
 
-/** Reads, checks and prepares a flow file and its sub-flows. Throws a FlowError with all the problems. */
-export function loadFlow(file: string, { cwd = process.cwd() }: { cwd?: string } = {}): Flow {
+/** Reads, checks and prepares a rails file and its nested rails files. Throws a RailsError with all the problems. */
+export function loadRails(file: string, { cwd = process.cwd() }: { cwd?: string } = {}): Rails {
   return loadFile(file, [], cwd);
 }

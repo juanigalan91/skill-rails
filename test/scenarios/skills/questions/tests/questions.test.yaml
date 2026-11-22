@@ -1,4 +1,4 @@
-flow: ../rails.yaml
+rails: ../rails.yaml
 git: false
 tests:
   - name: two questions are asked, a typed answer is accepted, and the third question is left out

@@ -3,7 +3,7 @@ import { Evaluator, Lexer, Parser, data } from '@actions/expressions';
 import type { FunctionDefinition } from '@actions/expressions/funcs/info';
 import type { Condition, Context } from './types.js';
 
-export const CONTEXTS = ['inputs', 'steps', 'env', 'flow', 'item', 'loop', 'failure'];
+export const CONTEXTS = ['inputs', 'steps', 'env', 'rails', 'item', 'loop', 'failure'];
 export const EXPRESSION = /\$\{\{([\s\S]*?)\}\}/g;
 const WHOLE = /^\s*\$\{\{([\s\S]*?)\}\}\s*$/;
 

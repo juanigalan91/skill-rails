@@ -1,4 +1,4 @@
-flow: ../rails.yaml
+rails: ../rails.yaml
 git: false
 tests:
   - name: a typed change goes into the next draft, then the user approves
@@ -7,7 +7,7 @@ tests:
       decide: [{ answer: Make it shorter }, { answer: Approve }]
     expect:
       status: done
-      flow-outputs: { draft: second }
+      rails-outputs: { draft: second }
   - name: the user stops
     answers:
       draft: { text: first }

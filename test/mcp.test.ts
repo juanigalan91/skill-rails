@@ -8,7 +8,7 @@ import { createServer } from '../src/mcp.js';
 import { tempDir } from './helpers.js';
 
 describe('the MCP server', () => {
-  it('runs a flow with flow_start and flow_done', async () => {
+  it('runs a rails file with rails_start and rails_done', async () => {
     const dir = tempDir({
       'rails.yaml': "name: mcp\nsteps:\n  - id: a\n    prompt: Say hi.\n    output: { type: object, required: [text], properties: { text: { type: string } } }\n  - stop: '${{ steps.a.outputs.text }}'\n",
     });
@@ -19,15 +19,15 @@ describe('the MCP server', () => {
     await client.connect(clientTransport);
 
     const tools = (await client.listTools()).tools.map((tool) => tool.name);
-    expect(tools).toEqual(expect.arrayContaining(['flow_start', 'flow_done', 'flow_status', 'flow_reset', 'flow_check']));
+    expect(tools).toEqual(expect.arrayContaining(['rails_start', 'rails_done', 'rails_status', 'rails_reset', 'rails_check']));
 
     const call = async (name: string, args: Record<string, unknown>) => {
       const result = (await client.callTool({ name, arguments: args })) as { content: Array<{ text: string }> };
       return JSON.parse(result.content[0]?.text ?? '{}');
     };
-    expect(await call('flow_check', { file: 'rails.yaml' })).toMatchObject({ status: 'ok' });
-    expect(await call('flow_start', { file: 'rails.yaml' })).toMatchObject({ status: 'step', id: 'a', cwd: dir });
-    expect(await call('flow_done', { flow: 'mcp', step: 'a', output: { text: 'hi' } })).toMatchObject({ status: 'done', message: 'hi' });
+    expect(await call('rails_check', { file: 'rails.yaml' })).toMatchObject({ status: 'ok' });
+    expect(await call('rails_start', { file: 'rails.yaml' })).toMatchObject({ status: 'step', id: 'a', cwd: dir });
+    expect(await call('rails_done', { rails: 'mcp', step: 'a', output: { text: 'hi' } })).toMatchObject({ status: 'done', message: 'hi' });
     await client.close();
   });
 
@@ -47,10 +47,10 @@ describe('the MCP server', () => {
         const result = await client.callTool({ name, arguments: args }) as { content: Array<{ text: string }> };
         return JSON.parse(result.content[0]?.text ?? '{}');
       };
-      expect(await call('flow_start', { file: 'rails.yaml' })).toMatchObject({ status: 'step', cwd: dir, id: 'answer' });
-      expect(await call('flow_done', { flow: 'portable', step: 'answer', output: { text: 1 } })).toMatchObject({ status: 'invalid' });
-      expect(await call('flow_status', { flow: 'portable' })).toMatchObject({ status: 'step', id: 'answer', cwd: dir });
-      expect(await call('flow_done', { flow: 'portable', step: 'answer', output: { text: 'hi' } })).toMatchObject({ status: 'done', message: 'hi', cwd: dir });
+      expect(await call('rails_start', { file: 'rails.yaml' })).toMatchObject({ status: 'step', cwd: dir, id: 'answer' });
+      expect(await call('rails_done', { rails: 'portable', step: 'answer', output: { text: 1 } })).toMatchObject({ status: 'invalid' });
+      expect(await call('rails_status', { rails: 'portable' })).toMatchObject({ status: 'step', id: 'answer', cwd: dir });
+      expect(await call('rails_done', { rails: 'portable', step: 'answer', output: { text: 'hi' } })).toMatchObject({ status: 'done', message: 'hi', cwd: dir });
     } finally {
       await client.close();
     }

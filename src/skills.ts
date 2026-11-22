@@ -1,9 +1,9 @@
-// Finds the flow of another skill by its name, for `uses: skill:<plugin>:<skill>` or `uses: skill:<skill>`.
+// Finds the rails file of another skill by its name, for `uses: skill:<plugin>:<skill>` or `uses: skill:<skill>`.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-const FLOW_FILE = 'rails.yaml';
+const RAILS_FILE = 'rails.yaml';
 
 const readJson = (file: string): unknown => {
   try {
@@ -13,7 +13,7 @@ const readJson = (file: string): unknown => {
   }
 };
 
-/** A checkout of a plugin repository: a marketplace or a plugin folder above the calling flow. */
+/** A checkout of a plugin repository: a marketplace or a plugin folder above the calling rails file. */
 function fromCheckout(plugin: string, skill: string, from: string): string[] {
   const found: string[] = [];
   for (let dir = from; ; dir = path.dirname(dir)) {
@@ -27,7 +27,7 @@ function fromCheckout(plugin: string, skill: string, from: string): string[] {
   }
 }
 
-/** The plugins that Claude Code installed: the ones of the marketplace of the calling flow first. */
+/** The plugins that Claude Code installed: the ones of the marketplace of the calling rails file first. */
 function fromClaudeInstalls(plugin: string, skill: string, from: string, env: NodeJS.ProcessEnv): string[] {
   const config = env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude');
   const installed = readJson(path.join(config, 'plugins', 'installed_plugins.json')) as { plugins?: Record<string, Array<{ installPath?: string }>> } | null;
@@ -47,9 +47,9 @@ function fromSkillFolders(skill: string, cwd: string, env: NodeJS.ProcessEnv): s
 
 /**
  * The rails.yaml of a skill, from `<plugin>:<skill>` or `<skill>`.
- * The order: SKILL_RAILS_SKILLS_PATH, a plugin checkout above the calling flow, the Claude Code plugin installs, then the skill folders.
+ * The order: SKILL_RAILS_SKILLS_PATH, a plugin checkout above the calling rails file, the Claude Code plugin installs, then the skill folders.
  */
-export function resolveSkillFlow(ref: string, from: string, { env = process.env, cwd = process.cwd() } = {}): string {
+export function resolveSkillRails(ref: string, from: string, { env = process.env, cwd = process.cwd() } = {}): string {
   const parts = ref.split(':');
   if (parts.length > 2 || parts.some((part) => !/^[A-Za-z0-9._-]+$/.test(part))) {
     throw new Error(`"skill:${ref}" must be skill:<plugin>:<skill> or skill:<skill>`);
@@ -60,10 +60,10 @@ export function resolveSkillFlow(ref: string, from: string, { env = process.env,
     ...extra.flatMap((dir) => [...(plugin ? [path.join(dir, plugin, 'skills', skill)] : []), path.join(dir, skill)]),
     ...(plugin ? [...fromCheckout(plugin, skill, from), ...fromClaudeInstalls(plugin, skill, from, env)] : fromSkillFolders(skill, cwd, env)),
   ];
-  const found = candidates.find((dir) => fs.existsSync(path.join(dir, FLOW_FILE)));
-  if (found) return path.join(found, FLOW_FILE);
+  const found = candidates.find((dir) => fs.existsSync(path.join(dir, RAILS_FILE)));
+  if (found) return path.join(found, RAILS_FILE);
   const where = plugin
-    ? `SKILL_RAILS_SKILLS_PATH, a checkout of the plugin "${plugin}" above this flow, or an installed plugin "${plugin}"`
+    ? `SKILL_RAILS_SKILLS_PATH, a checkout of the plugin "${plugin}" above this rails file, or an installed plugin "${plugin}"`
     : 'SKILL_RAILS_SKILLS_PATH, .claude/skills, .agents/skills or ~/.claude/skills';
-  throw new Error(`cannot find the skill flow "skill:${ref}" (a ${FLOW_FILE} in ${where})`);
+  throw new Error(`cannot find the rails file of "skill:${ref}" (a ${RAILS_FILE} in ${where})`);
 }

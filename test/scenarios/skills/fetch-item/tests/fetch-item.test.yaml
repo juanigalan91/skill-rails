@@ -1,4 +1,4 @@
-flow: ../rails.yaml
+rails: ../rails.yaml
 git: false
 path: [stubs]
 tests:
@@ -29,7 +29,7 @@ tests:
       status: done
       steps: { script: failure, retry: success }
       outputs: { retry.value: fetched --format text APP-1 }
-  - name: another exit code fails the flow, and on-failure saves the reason
+  - name: another exit code fails the run, and on-failure saves the reason
     inputs: { ids: APP-1 }
     env: { STUB: down }
     answers:
@@ -38,12 +38,12 @@ tests:
       status: failed
       message: /service down/
       files: { error.txt: /service down/ }
-  - name: an input out of its enum is refused before the flow runs
+  - name: an input out of its enum is refused before the run
     inputs: { ids: APP-1, format: xml }
     expect:
       status: error
       message: /must be one of text, json/
-  - name: a sub-flow failure ends the flow, with its reason
+  - name: a nested rails file failure ends the run, with its reason
     inputs: { ids: 'no ids' }
     expect:
       status: failed

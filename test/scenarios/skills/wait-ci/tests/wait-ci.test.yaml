@@ -1,4 +1,4 @@
-flow: ../rails.yaml
+rails: ../rails.yaml
 git: false
 path: [stubs]
 tests:
@@ -7,7 +7,7 @@ tests:
       status: done
       message: All checks passed.
       files: { .calls: "2\n" }
-  - name: failed checks fail the flow with their names
+  - name: failed checks fail the run with their names
     env: { CI_RESULT: failed }
     expect:
       status: failed

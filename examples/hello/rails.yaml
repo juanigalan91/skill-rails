@@ -1,4 +1,4 @@
-# The smallest useful flow: a shell step, a question, a prompt with a checked output, and an end.
+# The smallest useful rails file: a shell step, a question, a prompt with a checked output, and an end.
 name: hello
 inputs:
   who:
@@ -7,7 +7,7 @@ inputs:
 
 steps:
   - id: greet
-    run: echo "greeting=Hello, $WHO" >> "$FLOW_OUTPUT"
+    run: echo "greeting=Hello, $WHO" >> "$RAILS_OUTPUT"
     env:
       WHO: ${{ inputs.who }}
 

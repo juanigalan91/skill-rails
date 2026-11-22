@@ -2,10 +2,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { check, start } from '../src/api.js';
-import { resolveSkillFlow } from '../src/skills.js';
+import { resolveSkillRails } from '../src/skills.js';
 import { tempDir } from './helpers.js';
 
-const CORE = 'name: ctx\nsteps:\n  - id: context\n    run: echo "PR=42" >> "$FLOW_OUTPUT"\n';
+const CORE = 'name: ctx\nsteps:\n  - id: context\n    run: echo "PR=42" >> "$RAILS_OUTPUT"\n';
 const PARENT = "name: parent\nsteps:\n  - id: pr\n    uses: skill:acme-core:pr-context\n  - stop: 'PR ${{ steps.pr.outputs.steps.context.outputs.PR }}'\n";
 const saved = { ...process.env };
 
@@ -19,7 +19,7 @@ afterEach(() => {
 });
 
 describe('uses: skill:<plugin>:<skill>', () => {
-  it('finds the skill in the marketplace checkout above the flow', () => {
+  it('finds the skill in the marketplace checkout above the rails file', () => {
     const dir = tempDir({
       '.claude-plugin/marketplace.json': JSON.stringify({ plugins: [{ name: 'acme-core', source: './plugins/core' }] }),
       'plugins/core/skills/pr-context/rails.yaml': CORE,
@@ -28,7 +28,7 @@ describe('uses: skill:<plugin>:<skill>', () => {
     expect(start({ file: path.join(dir, 'plugins/factory/skills/ci/rails.yaml'), cwd: dir })).toMatchObject({ status: 'done', message: 'PR 42' });
   });
 
-  it('finds the skill in the Claude Code plugin installs, the marketplace of the flow first', () => {
+  it('finds the skill in the Claude Code plugin installs, the marketplace of the rails file first', () => {
     const cache = tempDir({
       'other/acme-core/2.0.0/skills/pr-context/rails.yaml': CORE.replace('42', '7'),
       'shared/acme-core/1.2.0/skills/pr-context/rails.yaml': CORE,
@@ -55,7 +55,7 @@ describe('uses: skill:<plugin>:<skill>', () => {
 
   it('finds a standalone skill by its name', () => {
     const cwd = tempDir({ '.claude/skills/pr-context/rails.yaml': CORE });
-    expect(resolveSkillFlow('pr-context', cwd, { cwd, env: {} })).toBe(path.join(cwd, '.claude/skills/pr-context/rails.yaml'));
+    expect(resolveSkillRails('pr-context', cwd, { cwd, env: {} })).toBe(path.join(cwd, '.claude/skills/pr-context/rails.yaml'));
   });
 
   it('resolves standalone skill calls in the explicitly selected project', () => {
@@ -66,12 +66,12 @@ describe('uses: skill:<plugin>:<skill>', () => {
     expect(start({ file, cwd })).toMatchObject({ status: 'done', message: 'PR 42' });
   });
 
-  it('refuses a flow when the skill is not found, or the name is not valid', () => {
+  it('refuses a uses step when the skill is not found, or the name is not valid', () => {
     const dir = tempDir({ 'rails.yaml': PARENT });
     expect(check({ file: path.join(dir, 'rails.yaml') })).toMatchObject({
       status: 'error',
-      errors: [expect.stringContaining('cannot find the skill flow "skill:acme-core:pr-context"')],
+      errors: [expect.stringContaining('cannot find the rails file of "skill:acme-core:pr-context"')],
     });
-    expect(() => resolveSkillFlow('a:b:c', dir)).toThrow('must be skill:<plugin>:<skill> or skill:<skill>');
+    expect(() => resolveSkillRails('a:b:c', dir)).toThrow('must be skill:<plugin>:<skill> or skill:<skill>');
   });
 });
