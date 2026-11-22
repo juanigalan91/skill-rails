@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.1
 
 - Add schema-aware YAML linting through ESLint, using the existing workflow schema to reject unknown keys and invalid types.
 - Run linting in CI and before npm publication; recommend YAML/ESLint editor extensions and configure local schema completion.
