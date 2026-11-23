@@ -67,7 +67,7 @@ export function validateRails(rails: unknown): string[] {
   validateSteps((rails as { steps: unknown[] }).steps, '/steps', errors, ids);
   const onFailure = (rails as { 'on-failure'?: unknown[] })['on-failure'];
   if (onFailure) validateSteps(onFailure, '/on-failure', errors, ids);
-  for (const id of new Set(ids.filter((id, i) => ids.indexOf(id) !== i))) errors.push(`step id "${id}" is used twice`);
+  for (const id of new Set(ids.filter((id, i) => ids.indexOf(id) !== i))) errors.push(`step id "${id}" is used twice: give each step its own id`);
   return errors;
 }
 

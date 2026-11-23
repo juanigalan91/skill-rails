@@ -35,6 +35,7 @@ export interface TestCase {
   name: string;
   /** The test file, for relative paths. */
   file: string;
+  /** The rails file; empty in a mode: agent test of a Markdown skill. */
   rails: string;
   /** A folder copied into the temp working directory. */
   fixture?: string;
@@ -127,8 +128,9 @@ export function loadTests(file: string): TestCase[] {
       env: { ...(shared.env as object), ...(test.env as object) },
       path: [...((test.path as string[]) ?? []), ...((shared.path as string[]) ?? [])],
     } as Partial<TestCase>;
-    if (!merged.rails) throw new Error(`${file}: a test needs a rails key`);
-    return { ...merged, rails: merged.rails, file, name: merged.name ?? (tests ? `test ${index + 1}` : path.basename(file)) } as TestCase;
+    // A mode: agent test of a Markdown skill has no rails file: only the files, transcript and judge expectations apply.
+    if (!merged.rails && merged.mode !== 'agent') throw new Error(`${file}: a test needs a rails key (only a mode: agent test can have none)`);
+    return { ...merged, rails: merged.rails ?? '', file, name: merged.name ?? (tests ? `test ${index + 1}` : path.basename(file)) } as TestCase;
   });
 }
 
@@ -310,6 +312,7 @@ interface Run {
 }
 
 function stateOf(run: Run): State | undefined {
+  if (!run.railsName) return undefined;
   try {
     return readState(run.railsName, run.cwd);
   } catch {
@@ -365,7 +368,7 @@ function driveRails(run: Run): Report {
     const count = used.get(key) ?? 0;
     const given = answers[key];
     const answer = (Array.isArray(given) ? given[count] : given) as ({ $files?: Record<string, string>; $fail?: string } & Record<string, unknown>) | undefined;
-    if (!answer) throw new Error(`the run ran step "${options.step}" a ${count + 1}th time, and the test has ${count} answers for it`);
+    if (!answer) throw new Error(`the run ran step "${options.step}" a ${count + 1}th time, and the test has ${count} answers for it: add an answer to its list`);
     used.set(key, count + 1);
     const { $files, $fail, ...outputs } = answer;
     writeFiles(cwd, $files);
@@ -430,7 +433,7 @@ function driveRails(run: Run): Report {
 /** Agent mode: the agent does the request; the report comes from the saved state of the run (null when it has none). */
 function driveAgent(run: Run): Report | null {
   if (!run.test.request) throw new Error('a test with mode: agent needs a request');
-  run.railsName = loadRails(path.resolve(run.dir, run.test.rails), { cwd: run.cwd }).name;
+  run.railsName = run.test.rails ? loadRails(path.resolve(run.dir, run.test.rails), { cwd: run.cwd }).name : '';
   run.transcript = run.agent(substitute(run.test.request, { cwd: run.cwd, dir: run.dir }), run.cwd, process.env);
   const state = stateOf(run);
   if (!state) return null;

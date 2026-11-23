@@ -303,6 +303,6 @@ export type Report = (
   | { status: 'done' | 'failed' | 'running'; rails: string; message: string | null; outputs?: Record<string, unknown>; notes?: string[] }
   | { status: 'invalid'; id: string; errors: string[]; output?: JsonObject }
   | { status: 'error'; errors: string[] }
-  | { status: 'ok'; rails: string; steps?: number }
+  | { status: 'ok'; rails: string; steps?: number; /** Advice on the design of the rails file. */ warnings?: string[] }
   | { status: 'reset'; rails: string }
 ) & { cwd?: string; next?: string; /** start: how the agent acts on each result. */ protocol?: string };

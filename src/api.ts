@@ -1,5 +1,6 @@
 // The commands that the CLI and the MCP server share. Each one returns the JSON report for the agent.
 import path from 'node:path';
+import { advice } from './advice.js';
 import { advanceRun, failCode, submitCode } from './code.js';
 import { advance, failPending, finish, newState, report, rootResults, submit } from './engine.js';
 import { loadRails } from './rails.js';
@@ -90,11 +91,12 @@ export function reset({ rails, cwd = process.cwd() }: { rails: string; cwd?: str
   return { status: 'reset', rails };
 }
 
-/** Checks a rails file without running it. */
+/** Checks a rails file without running it, and gives advice on its design. */
 export function check({ file, cwd = process.cwd() }: { file: string; cwd?: string }): Report {
   try {
     const rails = loadRails(file, { cwd });
-    return { status: 'ok', rails: rails.name, ...(rails.code ? {} : { steps: rails.steps.length }) };
+    const warnings = advice(rails);
+    return { status: 'ok', rails: rails.name, ...(rails.code ? {} : { steps: rails.steps.length }), ...(warnings.length ? { warnings } : {}) };
   } catch (error) {
     return errorReport(error);
   }

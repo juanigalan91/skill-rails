@@ -138,3 +138,71 @@ export function toCsv(rows: BenchRow[]): string {
   };
   return [keys.join(','), ...rows.map((row) => keys.map((key) => cell(row[key])).join(','))].join('\n') + '\n';
 }
+
+/** The rows of a CSV file that toCsv wrote. */
+export function fromCsv(text: string): BenchRow[] {
+  const records: string[][] = [];
+  let record: string[] = [];
+  let cell = '';
+  let quoted = false;
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i]!;
+    if (quoted) {
+      if (char === '"' && text[i + 1] === '"') cell += text[++i];
+      else if (char === '"') quoted = false;
+      else cell += char;
+    } else if (char === '"') quoted = true;
+    else if (char === ',') {
+      record.push(cell);
+      cell = '';
+    } else if (char === '\n') {
+      records.push([...record, cell]);
+      record = [];
+      cell = '';
+    } else cell += char;
+  }
+  if (cell || record.length) records.push([...record, cell]);
+  const [header = [], ...lines] = records;
+  const number = (value: string | undefined) => (value === undefined || value === '' ? undefined : Number(value));
+  return lines.map((line) => {
+    const get = (key: string) => line[header.indexOf(key)];
+    const row: BenchRow = {
+      variant: get('variant') ?? '', test: get('test') ?? '', run: number(get('run')) ?? 0, passed: get('passed') === 'true',
+      failures: get('failures') ? get('failures')!.split(' | ') : [], ms: number(get('ms')) ?? 0, agentSteps: number(get('agentSteps')) ?? 0,
+    };
+    for (const key of ['turns', 'costUsd', 'inputTokens', 'outputTokens'] as const) {
+      const value = number(get(key));
+      if (value !== undefined) row[key] = value;
+    }
+    return row;
+  });
+}
+
+/**
+ * The regressions against a baseline, for each test and variant in both: a lower pass rate,
+ * or a median that grows more than maxIncrease percent: the turns and the cost of live runs, else the time.
+ */
+export function compare(rows: BenchRow[], baseline: BenchRow[], maxIncrease = 20): string[] {
+  const groups = (list: BenchRow[]) => {
+    const map = new Map<string, BenchRow[]>();
+    for (const row of list) map.set(`${row.test} (${row.variant})`, [...(map.get(`${row.test} (${row.variant})`) ?? []), row]);
+    return map;
+  };
+  const before = groups(baseline);
+  const regressions: string[] = [];
+  for (const [name, now] of groups(rows)) {
+    const old = before.get(name);
+    if (!old) continue;
+    const rate = (list: BenchRow[]) => list.filter((row) => row.passed).length / list.length;
+    if (rate(now) < rate(old)) regressions.push(`${name}: passed ${Math.round(rate(now) * 100)}% of the runs, ${Math.round(rate(old) * 100)}% before`);
+    const live = now.some((row) => row.turns !== undefined) && old.some((row) => row.turns !== undefined);
+    for (const key of live ? (['turns', 'costUsd'] as const) : (['ms'] as const)) {
+      const pick = (list: BenchRow[]) => median(list.map((row) => row[key]).filter((value): value is number => typeof value === 'number'));
+      const [a, b] = [pick(old), pick(now)];
+      if (a === undefined || b === undefined || a <= 0) continue;
+      const growth = ((b - a) / a) * 100;
+      if (growth > maxIncrease) regressions.push(`${name}: median ${key} ${b} is ${Math.round(growth)}% more than ${a} (limit ${maxIncrease}%)`);
+    }
+  }
+  return regressions;
+}

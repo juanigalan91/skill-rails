@@ -35,7 +35,7 @@ describe('validateRails', () => {
   });
 
   it('refuses a step id that is used twice', () => {
-    expect(errorsOf({ name: 'x', steps: [{ id: 'a', run: 'x' }, { id: 'a', run: 'y' }] })).toEqual(['step id "a" is used twice']);
+    expect(errorsOf({ name: 'x', steps: [{ id: 'a', run: 'x' }, { id: 'a', run: 'y' }] })).toEqual(['step id "a" is used twice: give each step its own id']);
   });
 });
 

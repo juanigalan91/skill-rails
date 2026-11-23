@@ -67,12 +67,12 @@ function listValue(raw: unknown): string[] | null {
 
 export function resolveInputs(spec: Record<string, InputSpec>, given: Record<string, unknown>): Record<string, InputValue> {
   const errors: string[] = [];
-  for (const key of Object.keys(given)) if (!Object.hasOwn(spec, key)) errors.push(`unknown input "${key}"`);
+  for (const key of Object.keys(given)) if (!Object.hasOwn(spec, key)) errors.push(`unknown input "${key}": the inputs are ${Object.keys(spec).join(', ') || 'none'}`);
   const values: Record<string, InputValue> = {};
   for (const [key, def] of Object.entries(spec)) {
     const raw = given[key];
     if (raw === undefined || raw === null) {
-      if (def.required) errors.push(`input "${key}" is required`);
+      if (def.required) errors.push(`input "${key}" is required: give it with --input ${key}=<value>`);
       values[key] = def.default ?? (def.type === 'list' ? [] : null);
     } else if (def.type === 'boolean') {
       if (![true, false, 'true', 'false'].includes(raw as string | boolean)) errors.push(`input "${key}" must be true or false`);
@@ -509,7 +509,7 @@ export function advance(state: State, { exec = runCommand }: { exec?: Exec } = {
 /** Records the output of the waiting step. Returns the errors; none when the run can go on. */
 export function submit(state: State, id: string, output: unknown = {}): string[] {
   if (!state.pending) return [`no step waits for an output: the run is ${state.status}`];
-  if (state.pending.id !== id) return [`the current step is "${state.pending.id}", not "${id}"`];
+  if (state.pending.id !== id) return [`the current step is "${state.pending.id}", not "${id}": report step "${state.pending.id}"`];
   if (state.pending.type === 'wait') {
     // The poll goes on from where it stopped: the step keeps its place.
     state.pending = null;
