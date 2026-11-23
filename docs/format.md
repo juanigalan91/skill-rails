@@ -30,15 +30,45 @@ steps:
       TITLE: ${{ steps.text.outputs.title }}
 ```
 
+## The core
+
+Most skills need only these keys:
+
+| Key | Use |
+|-----|-----|
+| `name` | The name of the run. |
+| `inputs` | The values that the skill gets: `type`, `default`, `required`, `enum`. |
+| `steps` | The steps, in order. |
+| `run` | A command or a script in `scripts/`: the mechanical work, with no model turn. |
+| `prompt` with `output` | The judgment: the agent follows the instructions and reports JSON that matches `output`. |
+| `ask` | A question to the user. |
+| `if` and `stop` (or `fail`) | A gate: end the run when a condition is true. |
+
+The other keys (`skill`, `foreach`, `repeat`, `uses`, `set`, `note`, `on-failure`, `outputs`) are for larger skills.
+
 ## YAML linting
 
 Run `yarn lint` from the checkout to check all YAML syntax and validate rails files against `schema/rails.schema.json`. ESLint uses `eslint-plugin-yml` and `eslint-plugin-json-schema-validator`; schema validation uses the local file and disables SchemaStore lookups. Changes to allowed keys in the schema therefore apply to linting too.
 
 Schema checks cover `rails.yaml`/`rails.yml` and nested rails files under `skills/`, `examples/`, and `test/scenarios/skills/`. Test definitions (`*.test.yaml`, `*.test.yml`, and files under `tests/`) and GitHub Actions files receive YAML syntax checks without the rails schema, because they use different formats. Ignored dependency/build directories are excluded.
 
+In another repository, add this first line to a rails file: the **YAML** (Red Hat) extension then completes and checks its keys.
+
+```yaml
+# yaml-language-server: $schema=https://unpkg.com/skill-rails@0.7/schema/rails.schema.json
+```
+
 Install the recommended **YAML** (Red Hat) and **ESLint** extensions in VS Code or Cursor. The repository settings associate rails files with the same local schema for allowed-key completion and validation. For a rails file outside the configured paths, add its glob to both `eslint.config.js` and `.vscode/settings.json`.
 
 Linting checks YAML structure, keys, and types. Use `skill-rails check path/to/rails.yaml` for runner-specific validation such as duplicate step IDs, expressions, prompt files, and the resolution of nested rails files. Neither command runs the steps.
+
+`check` also gives `warnings` on the design of a YAML rails file, from what the [benchmarks](benchmarks.md) show:
+
+- No agent step and at most one run step: a `SKILL.md` that runs the script costs less.
+- Two `prompt` steps in a row with no `if` on the second: each one costs a model turn, so merge them, unless the second needs the checked output of the first.
+- A `prompt` that is mostly a shell code block: a `run` step runs it with no model turn.
+
+A warning does not make the check fail.
 
 ## TypeScript rails files
 

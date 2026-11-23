@@ -113,7 +113,7 @@ describe('a run', () => {
   });
 
   it('refuses unknown and wrong inputs', () => {
-    expect(start({ file, cwd: dir, inputs: { other: 'x' } })).toMatchObject({ status: 'error', errors: ['unknown input "other"'] });
+    expect(start({ file, cwd: dir, inputs: { other: 'x' } })).toMatchObject({ status: 'error', errors: [expect.stringMatching(/^unknown input "other": the inputs are /)] });
   });
 
   it('resets a run', () => {

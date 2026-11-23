@@ -24,7 +24,7 @@ Prefix these commands with `npx` when using a local npm installation.
 | `skill-rails done <rails> <step-id> --fail <reason>` | Fail the pending step; configured error handling may continue the run. |
 | `skill-rails status <rails>` | Show the pending step and recorded results. |
 | `skill-rails reset <rails>` | Delete saved state for the run. |
-| `skill-rails check <file>` | Validate a rails file without executing its steps. Loading TypeScript still executes module code. |
+| `skill-rails check <file>` | Validate a rails file without executing its steps, and give `warnings` on its design. Loading TypeScript still executes module code. |
 | `skill-rails test [<file or folder> ...]` | Run discovered `*.test.yaml` tests; targets default to the current folder. |
 | `skill-rails record <rails> [--out <file>]` | Generate a test from a saved run. |
 | `skill-rails trace <rails>` | Print one JSON line per recorded agent step, including its request, answer, and outcome. |
@@ -37,7 +37,7 @@ All commands accept `--cwd <project-directory>`. Use the same project directory 
 
 Tests also accept `--json`, `--quiet`, `--live`, and `--agent <command>`. Live tests call a real model; see [Testing](testing.md).
 
-Benchmarks also accept `--live`, `--agent <command>`, and `--transcripts <directory>`. See the [benchmark reference](testing.md#bench) and [recorded results](benchmarks.md).
+Benchmarks also accept `--live`, `--agent <command>`, `--transcripts <directory>`, and `--baseline <file.csv>` with `--max-increase <percent>`. See the [benchmark reference](testing.md#bench) and [recorded results](benchmarks.md).
 
 ## Drive a run
 
@@ -83,7 +83,7 @@ Configure a local stdio server in an MCP client:
   "mcpServers": {
     "skill-rails": {
       "command": "npx",
-      "args": ["-y", "skill-rails@0.6", "mcp"]
+      "args": ["-y", "skill-rails@0.7", "mcp"]
     }
   }
 }

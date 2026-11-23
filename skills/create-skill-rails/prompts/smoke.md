@@ -2,4 +2,6 @@ The rails file and its deterministic tests passed for `${{ steps.scaffold.output
 
 Before a real use, exercise the generated rails file once in a safe disposable copy or fixture, using a local remote and stubs for any external side effects. Never push, publish, send messages, or create real PRs during this smoke run. Use the run-skill-rails bootstrap protocol to drive agent steps; use a separate working directory so nested runs cannot overwrite the state of this authoring run. If the environment cannot safely exercise the rails file, fail this step and explain the blocker instead of claiming a successful smoke run.
 
+Design warnings of `skill-rails check`: ${{ steps.recheck.outputs.warnings || steps.check.outputs.warnings || 'none' }}. Put each warning in the report, with the reason it stays.
+
 Inspect the actual generated files and report the file list, step table, counts of code and agent steps, validation result, and what the safe smoke run covered. For a migration, include the rule mapping from the earlier structured audit and any behavioral differences. Do not generate backup or audit files. Return report, files, codeSteps, and agentSteps. Do not claim live model benchmarks from deterministic tests.

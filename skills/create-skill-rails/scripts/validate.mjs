@@ -8,7 +8,7 @@ const target = path.resolve(process.env.TARGET);
 const errors = [];
 const invoke = (args) => {
   // Use the published runner so Git-installed plugins need no local node_modules.
-  const result = spawnSync('npx', ['-y', 'skill-rails@0.6', ...args], { encoding: 'utf8', timeout: 120000, maxBuffer: 4 * 1024 * 1024 });
+  const result = spawnSync('npx', ['-y', 'skill-rails@0.7', ...args], { encoding: 'utf8', timeout: 120000, maxBuffer: 4 * 1024 * 1024 });
   let report;
   try { report = JSON.parse(result.stdout); } catch { /* Report command failures below. */ }
   if (result.error || result.status !== 0 || report === undefined) {
@@ -19,6 +19,7 @@ const invoke = (args) => {
 };
 const check = invoke(['check', path.join(target, 'rails.yaml')]);
 if (check && check.status !== 'ok') errors.push(JSON.stringify(check));
+const warnings = check?.warnings ?? [];
 if (!fs.existsSync(path.join(target, 'SKILL.md'))) errors.push('SKILL.md is missing.');
 if (check?.status === 'ok') {
   const tests = path.join(target, 'tests');
@@ -30,3 +31,4 @@ if (check?.status === 'ok') {
 }
 output('valid', errors.length === 0 ? 'true' : 'false');
 output('errors', errors.join('\n'));
+output('warnings', warnings.join('\n'));

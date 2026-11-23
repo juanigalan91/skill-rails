@@ -227,6 +227,7 @@ tests:
 ```
 
 - Use it for a protocol smoke run on each host, and for trigger checks: `started: false` means that the agent did not start the run.
+- A test with no `rails` key tests a Markdown skill: only the `files`, `transcript` and `judge` expectations apply. Start with these tests before a migration: they show what the skill does now, and the same tests then check the migrated skill.
 - The agent command must have the skill available.
   For Claude Code, install the plugin, or name the path of the `SKILL.md` in the request.
 - A non-interactive run cannot answer `ask` steps.
@@ -285,6 +286,25 @@ variants:
 - A Markdown variant keeps only the `files`, `transcript` and `judge` expectations: it has no run state to check.
 - The runs go in a shuffled order, so that the effects of time and cache spread over the variants.
 - `--runs <n>` sets the count of runs, `--out <file.csv>` writes one line per run, and `--transcripts <dir>` saves the output of the agent of each live run.
+
+### Models and regressions
+
+A variant is an agent command, so a bench can also compare models, or check that a new model does not break a skill:
+
+```yaml
+variants:
+  sonnet: { agent: ./agent.sh --model sonnet }
+  haiku: { agent: ./agent.sh --model haiku }
+```
+
+`--baseline <file.csv>` compares the runs with the CSV of an earlier bench (`--out`), for each test and variant in both.
+The command fails on a regression: a lower pass rate, or a median that grows more than `--max-increase` percent (default 20).
+It compares the turns and the cost of live runs, and the time of fixed-answer runs.
+
+```bash
+skill-rails bench bench.yaml --live --out baseline.csv          # one time
+skill-rails bench bench.yaml --live --baseline baseline.csv     # after a change of the skill or of the model
+```
 
 For a fair comparison, use the same model, request and fixture for all the variants, and at least 10 runs.
 Isolate the agent: `claude -p --output-format json --strict-mcp-config --setting-sources project --plugin-dir <variant>` loads only the plugins of the variant, with no user MCP server and no user settings.

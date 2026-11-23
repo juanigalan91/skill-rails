@@ -51,7 +51,7 @@ The runner alone, with fixed answers and no model, took a median of 85 ms per te
 
 - **Many mechanical steps: a large gain.** The PR task took 65% fewer turns, 53% less time, and cost 47% less as a rails file. The Markdown version spends turns on each Git command, on reading each result, and on the order of the steps; the runner does that work in one call.
 - **One script: no gain.** The skill was already one command. The rails versions cost about 4% more: the agent reads the start report, then runs the command that the report gives.
-- **Mostly judgment: a small cost.** The check task is one agent step (find the commands) between runner steps. The rails version took 1 more turn and cost 13% more than the Markdown version, which the agent did in one pass. With a second agent step that only ran the commands, it cost 30% more: give mechanical work to a script, and merge agent steps that need no gate between them.
+- **Mostly judgment: a small cost.** The check task is one agent step (find the commands) between runner steps. The rails version took 1 more turn and cost 13% more than the Markdown version, which the agent did in one pass. With a second agent step that only ran the commands, it cost 30% more: give mechanical work to a script, and merge agent steps that need no gate between them. `skill-rails check` now warns about these designs.
 - **YAML and TypeScript: the same.** The agent gets the same reports from both. Their difference is the noise of the measure, at most 1 turn and 4% of the cost here.
 - **Read the transcripts.** Each extra turn in a transcript is a step that a script or a better prompt can remove.
 

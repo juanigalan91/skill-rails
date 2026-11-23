@@ -1,6 +1,6 @@
 {
   "name": "skill-rails",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Deterministic, testable YAML and TypeScript rails for AI agent skills.",
   "type": "module",
   "license": "MIT",

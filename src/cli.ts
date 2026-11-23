@@ -46,7 +46,7 @@ const USAGE = `Usage:
   skill-rails done <rails> <step-id> --fail <reason>           end the run with an error
   skill-rails status <rails>                                   print the current step and the step results
   skill-rails reset <rails>                                    delete the state of a run
-  skill-rails check <rails file>                               check a rails file without running it
+  skill-rails check <rails file>                               check a rails file without running it, and give advice on its design
   skill-rails test [<file or folder> ...] [--json]             run the *.test.yaml tests in these files and folders, and all folders below (default: the current folder); --quiet shows only the failures
       [--live] [--agent <command>]                             --live also runs the tests with live steps, judge or mode: agent, with the agent command (default: SKILL_RAILS_AGENT, else claude -p)
   skill-rails record <rails> [--out <file>]                    write a test file from the state of a run (default: stdout)
@@ -54,6 +54,7 @@ const USAGE = `Usage:
   skill-rails mcp                                              run the MCP server on stdio
   skill-rails bench <bench.yaml> [--runs <n>] [--out <csv>]   run the tests of each variant of a skill several times, and print the medians
       [--live] [--agent <command>] [--transcripts <dir>]       --live runs the mode: agent tests with a real agent, reads its turns, tokens and cost, and can save each agent output
+      [--baseline <csv>] [--max-increase <percent>]            fail on a regression against the CSV of an earlier run: a lower pass rate, or a median that grows more than the limit (default 20)
   skill-rails hook                                             the host hook: reads the hook JSON on stdin (Claude Code and Codex)
   skill-rails hooks                                            print the hooks configuration that runs the hook
   All commands accept --cwd <project-directory>.`;
@@ -177,7 +178,7 @@ export async function main(argv: string[], print = (value: Report) => process.st
       }
       case 'bench': {
         if (!first || first.startsWith('--')) throw new Error(USAGE);
-        const { bench, summary, toCsv } = await import('./bench.js');
+        const { bench, compare, fromCsv, summary, toCsv } = await import('./bench.js');
         const runs = option(args, 'runs');
         const transcripts = option(args, 'transcripts');
         const rows = bench(file(first), { live: args.includes('--live'), runs: runs ? Number(runs) : undefined, agent: option(args, 'agent'), transcripts: transcripts && file(transcripts) });
@@ -186,6 +187,14 @@ export async function main(argv: string[], print = (value: Report) => process.st
         const lines = summary(rows);
         const keys = [...new Set(lines.flatMap((line) => Object.keys(line)))];
         process.stdout.write(`${keys.join(' | ')}\n${keys.map(() => '---').join(' | ')}\n${lines.map((line) => keys.map((key) => line[key] ?? '').join(' | ')).join('\n')}\n`);
+        const baseline = option(args, 'baseline');
+        if (baseline) {
+          const limit = option(args, 'max-increase');
+          if (limit !== undefined && !(Number(limit) >= 0)) throw new Error('--max-increase must be a percent, for example 20');
+          const regressions = compare(rows, fromCsv(fs.readFileSync(file(baseline), 'utf8')), limit === undefined ? undefined : Number(limit));
+          process.stdout.write(regressions.length ? `\nRegressions:\n${regressions.map((line) => `- ${line}`).join('\n')}\n` : '\nNo regression against the baseline.\n');
+          if (regressions.length) return 1;
+        }
         return rows.every((row) => row.passed) ? 0 : 1;
       }
       case 'hook': {

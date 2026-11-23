@@ -14,7 +14,7 @@ export function statePath(name: string, cwd: string): string {
 
 export function readState(name: string, cwd: string): State {
   const file = statePath(name, cwd);
-  if (!fs.existsSync(file)) throw new Error(`no run of "${name}" was started in ${cwd}`);
+  if (!fs.existsSync(file)) throw new Error(`no run of "${name}" was started in ${cwd}: run start first, with the same --cwd`);
   return JSON.parse(fs.readFileSync(file, 'utf8')) as State;
 }
 

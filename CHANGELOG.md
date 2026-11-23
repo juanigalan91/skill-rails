@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.7.0
+
+- `check` gives `warnings` on the design of a YAML rails file: a skill that is one script, two prompt steps with no gate between them, and a prompt that is a shell command.
+- `mode: agent` tests can test a Markdown skill, with no `rails` key.
+- `bench --baseline <csv>` fails on a regression against an earlier run: a lower pass rate, or medians that grow more than `--max-increase` percent.
+- The create skill reports the design warnings; rails files can declare the schema for editors with a `yaml-language-server` comment.
+- The main error messages say how to fix the problem.
+
 ## 0.6.0
 
 - Allow fixed test answers to replace YAML `run` steps and TypeScript `sh` calls, including nested runs, repeated answers, file effects, and failures. Scoped keys keep nested shell overrides separate from bare agent answers.
